@@ -1,3 +1,6 @@
+﻿// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+// All rights reserved.
+
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 

@@ -1,3 +1,6 @@
+﻿// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+// All rights reserved.
+
 using DbBackup.RemoteSync;
 using DbBackup.RemoteSync.Service;
 using Microsoft.Extensions.Logging.EventLog;

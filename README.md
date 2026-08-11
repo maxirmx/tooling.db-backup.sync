@@ -1,3 +1,8 @@
+﻿<!--
+Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+All rights reserved.
+-->
+
 # DB Backup Remote Sync
 
 Windows service for downloading backup files that exist in a remote SFTP folder but do not yet exist in a local folder. Existing local files are never overwritten or deleted.

@@ -1,3 +1,6 @@
+﻿// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+// All rights reserved.
+
 namespace DbBackup.RemoteSync.Core.Tests;
 
 public sealed class WindowsPathMapperTests

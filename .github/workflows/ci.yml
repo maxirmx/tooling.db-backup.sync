@@ -1,3 +1,6 @@
+﻿# Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+# All rights reserved.
+
 name: ci
 
 on:
@@ -13,9 +16,9 @@ jobs:
   build-test-package:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
           cache: true
@@ -32,7 +35,7 @@ jobs:
           if ($null -eq $msi) { throw 'English MSI was not produced.' }
           ./eng/smoke-installer.ps1 -MsiPath $msi.FullName
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: DB-Backup-Remote-Sync
           path: |

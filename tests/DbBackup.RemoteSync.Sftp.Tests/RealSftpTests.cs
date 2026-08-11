@@ -1,3 +1,6 @@
+﻿// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+// All rights reserved.
+
 namespace DbBackup.RemoteSync.Sftp.Tests;
 
 public sealed class RealSftpTests

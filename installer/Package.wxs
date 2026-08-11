@@ -1,3 +1,8 @@
+﻿<!--
+  Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+  All rights reserved.
+-->
+
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
