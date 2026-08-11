@@ -174,7 +174,12 @@ public sealed record RemoteFileInventory(
 public sealed record SynchronizationProgress(
     string RemoteFile,
     long DownloadedBytes,
-    long TotalBytes);
+    long TotalBytes,
+    int FileNumber,
+    int FileCount,
+    int CompletedFiles,
+    long OverallDownloadedBytes,
+    long OverallTotalBytes);
 
 public sealed record SynchronizationResult(
     int RemoteFiles,

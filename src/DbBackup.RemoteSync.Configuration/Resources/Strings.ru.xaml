@@ -37,7 +37,8 @@
   <sys:String x:Key="ConfigurationValid">Конфигурация проверена.</sys:String>
   <sys:String x:Key="ConfigurationInvalid">Ошибка конфигурации: {0}</sys:String>
   <sys:String x:Key="Running">Выполняется синхронизация ({0}).</sys:String>
-  <sys:String x:Key="DownloadProgress">Загрузка {0}: {1} из {2} ({3:P1}).</sys:String>
+  <sys:String x:Key="DownloadProgress">Текущий файл {0} из {1}: {2}; {3} из {4} ({5:P1}).</sys:String>
+  <sys:String x:Key="OverallProgress">Общий прогресс: {0} из {1} ({2:P1}); завершено файлов {3} из {4}.</sys:String>
   <sys:String x:Key="Idle">Служба ожидает.</sys:String>
   <sys:String x:Key="NextAttempt">Следующая попытка: {0}</sys:String>
   <sys:String x:Key="RetryNumber">Неудачных попыток для текущего запуска: {0}</sys:String>

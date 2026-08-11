@@ -40,7 +40,43 @@ public sealed class SynchronizationEngineTests
         Assert.Equal("nested/new.sql", progress[0].RemoteFile);
         Assert.Equal(0, progress[0].DownloadedBytes);
         Assert.Equal(8, progress[0].TotalBytes);
+        Assert.Equal(1, progress[0].FileNumber);
+        Assert.Equal(1, progress[0].FileCount);
+        Assert.Equal(0, progress[0].CompletedFiles);
+        Assert.Equal(0, progress[0].OverallDownloadedBytes);
+        Assert.Equal(8, progress[0].OverallTotalBytes);
         Assert.Equal(8, progress[^1].DownloadedBytes);
+        Assert.Equal(1, progress[^1].CompletedFiles);
+        Assert.Equal(8, progress[^1].OverallDownloadedBytes);
+    }
+
+    [Fact]
+    public async Task ProgressIncludesAllPendingFilesAndAggregateBytes()
+    {
+        using var temporary = new TemporaryDirectory();
+        var remote = new FakeRemoteClient(new Dictionary<string, byte[]>
+        {
+            ["first.sql"] = [1, 2],
+            ["second.sql"] = [3, 4, 5],
+        });
+        var engine = CreateEngine(remote);
+        var progress = new List<SynchronizationProgress>();
+
+        await engine.SynchronizeAsync(
+            TestSettings.Create(temporary.Path),
+            "secret",
+            CreateTrust(),
+            CancellationToken.None,
+            progress.Add);
+
+        var secondFileStart = progress.First(item =>
+            item.FileNumber == 2 && item.DownloadedBytes == 0);
+        Assert.Equal(2, secondFileStart.FileCount);
+        Assert.Equal(1, secondFileStart.CompletedFiles);
+        Assert.Equal(2, secondFileStart.OverallDownloadedBytes);
+        Assert.Equal(5, secondFileStart.OverallTotalBytes);
+        Assert.Equal(2, progress[^1].CompletedFiles);
+        Assert.Equal(5, progress[^1].OverallDownloadedBytes);
     }
 
     [Fact]

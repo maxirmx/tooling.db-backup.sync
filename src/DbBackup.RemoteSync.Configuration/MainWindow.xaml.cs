@@ -377,20 +377,34 @@ public partial class MainWindow : Window
         {
             lines.Add(L("Stopping"));
         }
-        if (status.IsRunning && status.ActiveFile is not null && status.ActiveTotalBytes > 0)
+        if (status.IsRunning && status.ActiveFile is not null && status.ActiveFileCount > 0)
         {
-            var ratio = Math.Clamp(
-                (double)status.ActiveBytesDownloaded / status.ActiveTotalBytes,
-                0,
-                1);
-            DownloadProgressBar.Value = ratio * 100;
+            var currentRatio = status.ActiveTotalBytes > 0
+                ? Math.Clamp((double)status.ActiveBytesDownloaded / status.ActiveTotalBytes, 0, 1)
+                : status.ActiveCompletedFiles >= status.ActiveFileNumber ? 1 : 0;
+            var overallRatio = status.ActiveOverallTotalBytes > 0
+                ? Math.Clamp(
+                    (double)status.ActiveOverallBytesDownloaded / status.ActiveOverallTotalBytes,
+                    0,
+                    1)
+                : Math.Clamp((double)status.ActiveCompletedFiles / status.ActiveFileCount, 0, 1);
+            DownloadProgressBar.Value = overallRatio * 100;
             DownloadProgressBar.Visibility = Visibility.Visible;
             lines.Add(Format(
                 "DownloadProgress",
+                status.ActiveFileNumber,
+                status.ActiveFileCount,
                 status.ActiveFile,
                 FormatBytes(status.ActiveBytesDownloaded),
                 FormatBytes(status.ActiveTotalBytes),
-                ratio));
+                currentRatio));
+            lines.Add(Format(
+                "OverallProgress",
+                FormatBytes(status.ActiveOverallBytesDownloaded),
+                FormatBytes(status.ActiveOverallTotalBytes),
+                overallRatio,
+                status.ActiveCompletedFiles,
+                status.ActiveFileCount));
         }
         else
         {

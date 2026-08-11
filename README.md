@@ -37,6 +37,7 @@ The configuration utility is single-instance. Launching it again activates the e
 - Non-recursive mode processes direct children only. Recursive mode preserves relative subdirectories.
 - Existing local files are skipped without size, timestamp, or content comparison.
 - Every download uses a same-directory `.db-backup-download-*.partial` file followed by an atomic, non-overwriting move.
+- Status shows the current file separately; the progress bar and overall percentage cover all files still pending when the run began.
 - A local directory that conflicts with a remote file, an unsafe Windows filename, or a case-insensitive path collision fails the run before downloading.
 - A failed run stops at the first failed file. Completed downloads remain and are skipped when the service retries.
 - Remote modification timestamps are applied to completed files.
@@ -127,6 +128,7 @@ Tags in `vMAJOR.MINOR.PATCH` form build and publish the unsigned localized MSIs 
 - Без рекурсии обрабатываются только непосредственные файлы каталога. С рекурсией сохраняется структура вложенных каталогов.
 - Существующие локальные файлы пропускаются без сравнения размера, времени или содержимого.
 - Загрузка выполняется во временный файл `.db-backup-download-*.partial` в каталоге назначения, после чего используется атомарное перемещение без перезаписи.
+- Текущий файл показывается отдельно; индикатор и общий процент учитывают все файлы, ожидавшие загрузки в начале запуска.
 - Конфликт с локальным каталогом, недопустимое имя Windows или регистронезависимое совпадение путей прекращает запуск до начала загрузки.
 - При первой ошибке загрузки запуск прекращается. Уже завершённые файлы сохраняются и будут пропущены при повторной попытке.
 - Для завершённых файлов устанавливается время изменения удалённого файла.

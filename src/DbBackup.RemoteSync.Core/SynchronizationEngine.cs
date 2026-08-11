@@ -73,8 +73,13 @@ public sealed class SynchronizationEngine(
 
         var downloaded = 0;
         var raceSkipped = 0;
-        foreach (var mapped in missing)
+        var overallTotalBytes = missing.Aggregate(
+            0L,
+            (total, mapped) => checked(total + mapped.Remote.Length));
+        long completedBytes = 0;
+        for (var fileIndex = 0; fileIndex < missing.Count; fileIndex++)
         {
+            var mapped = missing[fileIndex];
             cancellationToken.ThrowIfCancellationRequested();
             var parent = Path.GetDirectoryName(mapped.Local)
                 ?? throw new InvalidOperationException("The destination file has no parent directory.");
@@ -83,7 +88,12 @@ public sealed class SynchronizationEngine(
             progress?.Invoke(new SynchronizationProgress(
                 mapped.Remote.RelativePath,
                 DownloadedBytes: 0,
-                TotalBytes: mapped.Remote.Length));
+                TotalBytes: mapped.Remote.Length,
+                FileNumber: fileIndex + 1,
+                FileCount: missing.Count,
+                CompletedFiles: fileIndex,
+                OverallDownloadedBytes: completedBytes,
+                OverallTotalBytes: overallTotalBytes));
 
             try
             {
@@ -100,16 +110,27 @@ public sealed class SynchronizationEngine(
                         bytes => progress?.Invoke(new SynchronizationProgress(
                             mapped.Remote.RelativePath,
                             bytes,
-                            mapped.Remote.Length)));
+                            mapped.Remote.Length,
+                            FileNumber: fileIndex + 1,
+                            FileCount: missing.Count,
+                            CompletedFiles: fileIndex,
+                            OverallDownloadedBytes: checked(completedBytes + bytes),
+                            OverallTotalBytes: overallTotalBytes)));
                     await remote.DownloadFileAsync(mapped.Remote, progressOutput, cancellationToken)
                         .ConfigureAwait(false);
                     await output.FlushAsync(cancellationToken).ConfigureAwait(false);
                 }
 
+                completedBytes = checked(completedBytes + mapped.Remote.Length);
                 progress?.Invoke(new SynchronizationProgress(
                     mapped.Remote.RelativePath,
                     DownloadedBytes: mapped.Remote.Length,
-                    TotalBytes: mapped.Remote.Length));
+                    TotalBytes: mapped.Remote.Length,
+                    FileNumber: fileIndex + 1,
+                    FileCount: missing.Count,
+                    CompletedFiles: fileIndex + 1,
+                    OverallDownloadedBytes: completedBytes,
+                    OverallTotalBytes: overallTotalBytes));
 
                 File.SetLastWriteTimeUtc(partialPath, mapped.Remote.LastWriteTimeUtc.UtcDateTime);
                 try

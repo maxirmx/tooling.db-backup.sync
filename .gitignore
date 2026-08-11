@@ -47,6 +47,10 @@ ScaffoldingReadMe.txt
 *~
 CodeCoverage/
 
+# Visual Studio user state and generated migration reports
+.vs/
+UpgradeLog*.htm
+
 # MSBuild Binary and Structured Log
 *.binlog
 

@@ -30,6 +30,11 @@ public sealed record ServiceStatus
     public string? ActiveFile { get; init; }
     public long ActiveBytesDownloaded { get; init; }
     public long ActiveTotalBytes { get; init; }
+    public int ActiveFileNumber { get; init; }
+    public int ActiveFileCount { get; init; }
+    public int ActiveCompletedFiles { get; init; }
+    public long ActiveOverallBytesDownloaded { get; init; }
+    public long ActiveOverallTotalBytes { get; init; }
     public DateTimeOffset? ActiveProgressUtc { get; init; }
     public DateTimeOffset? NextAttemptUtc { get; init; }
     public int RetryNumber { get; init; }

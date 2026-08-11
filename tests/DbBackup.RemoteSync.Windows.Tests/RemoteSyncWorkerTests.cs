@@ -142,6 +142,11 @@ public sealed class RemoteSyncWorkerTests : IDisposable
             Assert.NotNull(activeStatus);
             Assert.Equal(0, activeStatus.ActiveBytesDownloaded);
             Assert.Equal(4, activeStatus.ActiveTotalBytes);
+            Assert.Equal(1, activeStatus.ActiveFileNumber);
+            Assert.Equal(1, activeStatus.ActiveFileCount);
+            Assert.Equal(0, activeStatus.ActiveCompletedFiles);
+            Assert.Equal(0, activeStatus.ActiveOverallBytesDownloaded);
+            Assert.Equal(4, activeStatus.ActiveOverallTotalBytes);
             releaseDownload.SetResult();
             await WaitUntilAsync(() => worker.GetStatus().Status?.LastRun?.Succeeded == true);
             Assert.Null(worker.GetStatus().Status?.ActiveFile);
