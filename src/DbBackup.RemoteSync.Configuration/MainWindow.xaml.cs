@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
 // All rights reserved.
 
 using System.Diagnostics;
@@ -133,7 +133,15 @@ public partial class MainWindow : Window
         }
 
         await using var remote = _remoteFactory.Create(settings, password, ValidateHostKey);
-        await remote.TestConnectionAsync(CancellationToken.None);
+        var inventory = await remote.ListFilesAsync(CancellationToken.None);
+        RemoteFileEntry? readProbeFile = null;
+        if (inventory.Files.Count != 0)
+        {
+            readProbeFile = inventory.Files.FirstOrDefault(file => file.Length > 0)
+                ?? inventory.Files[0];
+            await remote.TestFileReadAsync(readProbeFile, CancellationToken.None);
+        }
+
         if (acceptedTrust is not null)
         {
             _pendingTrust = acceptedTrust;
@@ -144,7 +152,30 @@ public partial class MainWindow : Window
         }
 
         await RefreshTrustAsync();
-        MessageBox.Show(this, L("ConnectionSucceeded"), ProductConstants.ProductName, MessageBoxButton.OK, MessageBoxImage.Information);
+        var noFiles = inventory.Files.Count == 0;
+        var message = noFiles
+            ? Format(
+                "ConnectionSucceededNoFiles",
+                inventory.SkippedDirectories,
+                inventory.SkippedSymbolicLinks,
+                inventory.SkippedSpecialEntries)
+            : Format(
+                "ConnectionSucceeded",
+                inventory.Files.Count,
+                inventory.SkippedDirectories,
+                inventory.SkippedSymbolicLinks,
+                inventory.SkippedSpecialEntries);
+        if (readProbeFile is not null)
+        {
+            message += Environment.NewLine + Format("ReadProbeSucceeded", readProbeFile.RelativePath);
+        }
+
+        MessageBox.Show(
+            this,
+            message,
+            ProductConstants.ProductName,
+            MessageBoxButton.OK,
+            noFiles ? MessageBoxImage.Warning : MessageBoxImage.Information);
     }
 
     private async void Save_Click(object sender, RoutedEventArgs eventArgs) =>
@@ -183,14 +214,20 @@ public partial class MainWindow : Window
 
         await _trustStore.SaveAsync(trust);
         await _settingsStore.SaveAsync(settings);
+        string? serviceNotificationError = null;
         try
         {
-            await _controlClient.SendAsync(
+            var response = await _controlClient.SendAsync(
                 ControlCommand.ReloadConfiguration,
                 TimeSpan.FromSeconds(3));
+            if (!response.Accepted)
+            {
+                serviceNotificationError = response.Error ?? response.Code;
+            }
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            serviceNotificationError = exception.Message;
         }
 
         if (!string.IsNullOrWhiteSpace(oldFolder) &&
@@ -202,7 +239,25 @@ public partial class MainWindow : Window
         _loadedSettings = settings;
         _pendingTrust = null;
         PasswordInput.Clear();
-        MessageBox.Show(this, L("Saved"), ProductConstants.ProductName, MessageBoxButton.OK, MessageBoxImage.Information);
+        if (serviceNotificationError is null)
+        {
+            MessageBox.Show(
+                this,
+                L("Saved"),
+                ProductConstants.ProductName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        else
+        {
+            MessageBox.Show(
+                this,
+                Format("SavedServiceNotificationFailed", serviceNotificationError),
+                ProductConstants.ProductName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+
         await RefreshStatusAsync();
     }
 
@@ -223,8 +278,45 @@ public partial class MainWindow : Window
         });
     }
 
-    private void OpenLogs_Click(object sender, RoutedEventArgs eventArgs) =>
-        Process.Start(new ProcessStartInfo("eventvwr.msc", "/c:localhost") { UseShellExecute = true });
+    private async void Stop_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        await RunUiOperationAsync(async () =>
+        {
+            var response = await _controlClient.SendAsync(ControlCommand.CancelRun, TimeSpan.FromSeconds(3));
+            if (!response.Accepted)
+            {
+                throw new InvalidOperationException(Format("CommandRejected", response.Error ?? response.Code));
+            }
+
+            MessageBox.Show(this, L("StopQueued"), ProductConstants.ProductName, MessageBoxButton.OK, MessageBoxImage.Information);
+            await RefreshStatusAsync();
+        });
+    }
+
+    private void OpenLogs_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        try
+        {
+            if (!File.Exists(_paths.DiagnosticLogFile))
+            {
+                MessageBox.Show(
+                    this,
+                    L("DiagnosticLogMissing"),
+                    ProductConstants.ProductName,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var startInfo = new ProcessStartInfo("notepad.exe") { UseShellExecute = true };
+            startInfo.ArgumentList.Add(_paths.DiagnosticLogFile);
+            Process.Start(startInfo);
+        }
+        catch (Exception exception)
+        {
+            ShowError(exception);
+        }
+    }
 
     private void Language_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
     {
@@ -266,11 +358,14 @@ public partial class MainWindow : Window
         if (status is null)
         {
             ServiceStatusText.Text = L("ServiceUnavailable");
+            DownloadProgressBar.Visibility = Visibility.Collapsed;
             RunButton.IsEnabled = false;
+            StopButton.IsEnabled = false;
             return;
         }
 
         RunButton.IsEnabled = status.ConfigurationValid && !status.IsRunning;
+        StopButton.IsEnabled = status.IsRunning && !status.CancellationRequested;
         var lines = new List<string>
         {
             status.ConfigurationValid
@@ -278,6 +373,30 @@ public partial class MainWindow : Window
                 : Format("ConfigurationInvalid", LocalizeCode(status.ConfigurationError ?? "Unknown")),
             status.IsRunning ? Format("Running", status.ActiveReason ?? string.Empty) : L("Idle"),
         };
+        if (status.CancellationRequested)
+        {
+            lines.Add(L("Stopping"));
+        }
+        if (status.IsRunning && status.ActiveFile is not null && status.ActiveTotalBytes > 0)
+        {
+            var ratio = Math.Clamp(
+                (double)status.ActiveBytesDownloaded / status.ActiveTotalBytes,
+                0,
+                1);
+            DownloadProgressBar.Value = ratio * 100;
+            DownloadProgressBar.Visibility = Visibility.Visible;
+            lines.Add(Format(
+                "DownloadProgress",
+                status.ActiveFile,
+                FormatBytes(status.ActiveBytesDownloaded),
+                FormatBytes(status.ActiveTotalBytes),
+                ratio));
+        }
+        else
+        {
+            DownloadProgressBar.Visibility = Visibility.Collapsed;
+        }
+
         if (status.NextAttemptUtc is { } next)
         {
             lines.Add(Format("NextAttempt", next.ToLocalTime().ToString("G", CultureInfo.CurrentCulture)));
@@ -293,9 +412,13 @@ public partial class MainWindow : Window
                 ? Format(
                     "LastSucceeded",
                     last.CompletedUtc.ToLocalTime().ToString("G", CultureInfo.CurrentCulture),
+                    last.RemoteFiles,
                     last.Downloaded,
                     last.AlreadyPresent,
-                    last.RaceSkipped)
+                    last.RaceSkipped,
+                    last.SkippedDirectories,
+                    last.SkippedSymbolicLinks,
+                    last.SkippedSpecialEntries)
                 : Format(
                     "LastFailed",
                     last.CompletedUtc.ToLocalTime().ToString("G", CultureInfo.CurrentCulture),
@@ -385,6 +508,20 @@ public partial class MainWindow : Window
 
     private static string LocalizeCode(string code) =>
         Application.Current.TryFindResource(code) is string localized ? localized : code;
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] units = ["B", "KiB", "MiB", "GiB", "TiB"];
+        var value = (double)Math.Max(0, bytes);
+        var unit = 0;
+        while (value >= 1024 && unit < units.Length - 1)
+        {
+            value /= 1024;
+            unit++;
+        }
+
+        return $"{value:0.##} {units[unit]}";
+    }
 
     private static string Format(string key, params object[] arguments) =>
         string.Format(CultureInfo.CurrentCulture, L(key), arguments);

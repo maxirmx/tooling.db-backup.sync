@@ -24,14 +24,16 @@ Supported systems are Windows 10 22H2, Windows 11, and Windows Server 2019 or ne
 1. Install the `en-US` or `ru-RU` MSI as an administrator. The unsigned package may produce a Windows SmartScreen warning; verify its published SHA-256 checksum before continuing.
 2. Open **Configure DB Backup Remote Sync** from the Start menu and approve the UAC prompt.
 3. Enter the remote host, SSH port, username, password, absolute remote folder, local destination, daily local time, and recursive-mode preference.
-4. Select **Test and trust**. Check the displayed SHA-256 host-key fingerprint against a trusted source before accepting it. The key is stored only after authentication and remote-folder listing succeed.
-5. Select **Save and apply**. The utility creates the destination, grants the service identity access, protects the password, and reloads the running service.
+4. Select **Test configuration**. Check the displayed SHA-256 host-key fingerprint against a trusted source before accepting it. The key is stored only after authentication and remote-folder listing succeed.
+5. Select **Save configuration**. The utility creates the destination, grants the service identity access, protects the password, and reloads the running service. Select **Run now** when you want to start the first synchronization.
 
 The installed service starts automatically with delayed start. Before configuration it remains idle and reports `MissingSettings`; it never prompts for input.
+The configuration utility is single-instance. Launching it again activates the existing window.
 
 ## Synchronization rules
 
 - Only regular remote files are considered; symbolic links are ignored.
+- Entries without file-type metadata are queried again without following symbolic links; unresolved types fail with a diagnostic instead of being silently skipped.
 - Non-recursive mode processes direct children only. Recursive mode preserves relative subdirectories.
 - Existing local files are skipped without size, timestamp, or content comparison.
 - Every download uses a same-directory `.db-backup-download-*.partial` file followed by an atomic, non-overwriting move.
@@ -40,9 +42,10 @@ The installed service starts automatically with delayed start. Before configurat
 - Remote modification timestamps are applied to completed files.
 - The product never uploads files and never deletes completed local files.
 
-The service runs once per local calendar date. If it starts after the configured time without a completed run for that date, it catches up immediately. Failures are retried after 5, 15, and 30 minutes. Retry state survives service restarts.
+The service runs once per local calendar date while it remains active through the configured time. Starting or restarting it after that time skips the missed slot instead of beginning a download immediately; the next automatic run is scheduled for the following day. Failures are retried after 5, 15, and 30 minutes.
 
 **Run now** is serialized with scheduled work. A successful manual run after the daily due time satisfies that day's scheduled slot.
+Use **Stop** to cancel the active synchronization without stopping the Windows service. The incomplete partial file is removed; completed downloads remain in place.
 
 ## Security
 
@@ -57,7 +60,7 @@ Operational data is stored in `C:\ProgramData\DB Backup Remote Sync`. A major up
 
 ## Status and troubleshooting
 
-The utility shows configuration validity, active work, last result and counts, next scheduled attempt, and retry number. **Open Event Viewer** opens the Windows Application log; filter by source `DbBackupRemoteSync`.
+The utility shows configuration validity, active work, last result and counts, next scheduled attempt, and retry number. **Open diagnostic log** opens `C:\ProgramData\DB Backup Remote Sync\service.log`. The service also writes the Windows Application log under source `DbBackupRemoteSync`.
 
 Common checks:
 
@@ -80,7 +83,7 @@ Prerequisites are the .NET 10 SDK, PowerShell 7, and network access to restore t
 
 The build restores in locked mode, compiles the service and utility, runs all tests, publishes self-contained single-file executables, builds both localized MSIs, and writes adjacent SHA-256 checksum files under `artifacts/package`.
 
-Real-SFTP tests are opt-in. Define `SFTP_TEST_HOST`, `SFTP_TEST_USERNAME`, `SFTP_TEST_PASSWORD`, and `SFTP_TEST_FINGERPRINT`; optionally define `SFTP_TEST_PORT` and `SFTP_TEST_FOLDER`.
+Real-SFTP tests are opt-in. Define `SFTP_TEST_HOST`, `SFTP_TEST_USERNAME`, `SFTP_TEST_PASSWORD`, `SFTP_TEST_FINGERPRINT`, `SFTP_TEST_EXPECTED_FILE`, and `SFTP_TEST_EXPECTED_SHA256`; optionally define `SFTP_TEST_PORT` and `SFTP_TEST_FOLDER`. The expected file is relative to the configured folder and its SHA-256 value is hexadecimal.
 
 The installer smoke test performs real machine installation and removal and therefore requires an elevated disposable Windows environment:
 
@@ -111,14 +114,16 @@ Tags in `vMAJOR.MINOR.PATCH` form build and publish the unsigned localized MSIs 
 1. Установите пакет MSI `ru-RU` или `en-US` от имени администратора. Пакет не подписан, поэтому Windows SmartScreen может вывести предупреждение; перед запуском проверьте опубликованную контрольную сумму SHA-256.
 2. Откройте **Настройка DB Backup Remote Sync** в меню «Пуск» и подтвердите запрос UAC.
 3. Укажите сервер, порт SSH, имя пользователя, пароль, абсолютный удалённый каталог, локальный каталог, ежедневное местное время и режим вложенных каталогов.
-4. Нажмите **Проверить и доверять**. До подтверждения сверьте показанный отпечаток ключа сервера SHA-256 с доверенным источником. Ключ сохраняется только после успешной аутентификации и чтения удалённого каталога.
-5. Нажмите **Сохранить и применить**. Утилита создаст каталог назначения, предоставит доступ учётной записи службы, защитит пароль и перезагрузит конфигурацию работающей службы.
+4. Нажмите **Проверить конфигурацию**. До подтверждения сверьте показанный отпечаток ключа сервера SHA-256 с доверенным источником. Ключ сохраняется только после успешной аутентификации и чтения удалённого каталога.
+5. Нажмите **Сохранить конфигурацию**. Утилита создаст каталог назначения, предоставит доступ учётной записи службы, защитит пароль и перезагрузит конфигурацию работающей службы. Для первой синхронизации нажмите **Запустить сейчас**.
 
 Установленная служба запускается автоматически с отложенным запуском. До настройки она остаётся в режиме ожидания и сообщает `MissingSettings`; запросы ввода не выполняются.
+Утилита настройки работает в одном экземпляре. Повторный запуск активирует уже открытое окно.
 
 ## Правила синхронизации
 
 - Обрабатываются только обычные удалённые файлы; символические ссылки игнорируются.
+- Для объектов без данных о типе выполняется повторный безопасный запрос без перехода по символическим ссылкам; если тип определить нельзя, выводится ошибка вместо молчаливого пропуска.
 - Без рекурсии обрабатываются только непосредственные файлы каталога. С рекурсией сохраняется структура вложенных каталогов.
 - Существующие локальные файлы пропускаются без сравнения размера, времени или содержимого.
 - Загрузка выполняется во временный файл `.db-backup-download-*.partial` в каталоге назначения, после чего используется атомарное перемещение без перезаписи.
@@ -127,9 +132,10 @@ Tags in `vMAJOR.MINOR.PATCH` form build and publish the unsigned localized MSIs 
 - Для завершённых файлов устанавливается время изменения удалённого файла.
 - Программа никогда не отправляет файлы на сервер и не удаляет завершённые локальные файлы.
 
-Служба запускается один раз за местную календарную дату. Если она запущена после заданного времени, а запуск за текущую дату не завершён, синхронизация начинается немедленно. После ошибки выполняются повторные попытки через 5, 15 и 30 минут. Состояние попыток сохраняется при перезапуске службы.
+Служба запускает синхронизацию один раз за местную календарную дату, если она работает в заданное время. При запуске или перезапуске после этого времени пропущенный запуск не начинается автоматически; следующий автоматический запуск назначается на следующий день. После ошибки выполняются повторные попытки через 5, 15 и 30 минут.
 
 Команда **Запустить сейчас** не выполняется параллельно с другим запуском. Успешный ручной запуск после заданного времени закрывает плановый запуск текущего дня.
+Кнопка **Остановить** отменяет активную синхронизацию, не останавливая службу Windows. Незавершённый временный файл удаляется; завершённые загрузки сохраняются.
 
 ## Безопасность
 
@@ -144,7 +150,7 @@ Tags in `vMAJOR.MINOR.PATCH` form build and publish the unsigned localized MSIs 
 
 ## Состояние и диагностика
 
-Утилита показывает действительность конфигурации, активную операцию, последний результат и счётчики, следующую попытку и номер повтора. Кнопка **Открыть просмотр событий** открывает журнал Windows «Приложение»; используйте фильтр по источнику `DbBackupRemoteSync`.
+Утилита показывает действительность конфигурации, активную операцию, последний результат и счётчики, следующую попытку и номер повтора. Кнопка **Открыть журнал диагностики** открывает `C:\ProgramData\DB Backup Remote Sync\service.log`. Служба также пишет в журнал Windows «Приложение» с источником `DbBackupRemoteSync`.
 
 Основные проверки:
 
@@ -167,7 +173,7 @@ Test-NetConnection backup.example.com -Port 22
 
 Скрипт выполняет восстановление в заблокированном режиме, сборку, все тесты, публикацию самодостаточных одиночных EXE, создание двух локализованных MSI и файлов контрольных сумм SHA-256 в `artifacts/package`.
 
-Тесты с настоящим SFTP включаются переменными `SFTP_TEST_HOST`, `SFTP_TEST_USERNAME`, `SFTP_TEST_PASSWORD` и `SFTP_TEST_FINGERPRINT`. Дополнительно можно задать `SFTP_TEST_PORT` и `SFTP_TEST_FOLDER`.
+Тесты с настоящим SFTP включаются переменными `SFTP_TEST_HOST`, `SFTP_TEST_USERNAME`, `SFTP_TEST_PASSWORD`, `SFTP_TEST_FINGERPRINT`, `SFTP_TEST_EXPECTED_FILE` и `SFTP_TEST_EXPECTED_SHA256`. Дополнительно можно задать `SFTP_TEST_PORT` и `SFTP_TEST_FOLDER`. Имя ожидаемого файла задаётся относительно удалённого каталога, а SHA-256 — в шестнадцатеричном виде.
 
 Тест MSI действительно устанавливает и удаляет продукт, поэтому его следует запускать с повышенными правами только в одноразовой среде Windows:
 

@@ -22,6 +22,44 @@ public sealed class SchedulePlannerTests
     }
 
     [Fact]
+    public void StartupAfterDailyTimeSkipsCatchUpWhenRequested()
+    {
+        var now = new DateTimeOffset(2026, 8, 11, 10, 0, 0, TimeSpan.Zero);
+
+        var decision = SchedulePlanner.Evaluate(
+            new SchedulerState(),
+            now,
+            new TimeOnly(2, 0),
+            TimeZoneInfo.Utc,
+            skipDueAtStartup: true);
+
+        Assert.Equal(ScheduledAction.None, decision.Action);
+        Assert.Equal(new DateOnly(2026, 8, 11), decision.State.ScheduledDate);
+        Assert.Equal(ScheduledSlotStatus.Skipped, decision.State.ScheduledStatus);
+        Assert.Equal(new DateTimeOffset(2026, 8, 12, 2, 0, 0, TimeSpan.Zero), decision.NextWakeUtc);
+    }
+
+    [Fact]
+    public void StartupBeforeDailyTimeStillRunsWhenScheduleBecomesDue()
+    {
+        var state = new SchedulerState();
+        var startup = SchedulePlanner.Evaluate(
+            state,
+            new DateTimeOffset(2026, 8, 11, 1, 0, 0, TimeSpan.Zero),
+            new TimeOnly(2, 0),
+            TimeZoneInfo.Utc,
+            skipDueAtStartup: true);
+
+        var due = SchedulePlanner.Evaluate(
+            startup.State,
+            startup.NextWakeUtc,
+            new TimeOnly(2, 0),
+            TimeZoneInfo.Utc);
+
+        Assert.Equal(ScheduledAction.RunNow, due.Action);
+    }
+
+    [Fact]
     public void StartupBeforeDailyTimeWaits()
     {
         var now = new DateTimeOffset(2026, 8, 11, 1, 0, 0, TimeSpan.Zero);
@@ -129,5 +167,20 @@ public sealed class SchedulePlannerTests
         Assert.Equal(new DateOnly(2026, 8, 11), updated.ScheduledDate);
         Assert.Equal(ScheduledSlotStatus.Succeeded, updated.ScheduledStatus);
         Assert.Equal(0, updated.AttemptsCompleted);
+    }
+
+    [Fact]
+    public void CanceledRunAfterDailyTimeSkipsSlot()
+    {
+        var updated = SchedulePlanner.RecordCanceledRun(
+            new SchedulerState(),
+            new DateTimeOffset(2026, 8, 11, 2, 1, 0, TimeSpan.Zero),
+            new TimeOnly(2, 0),
+            TimeZoneInfo.Utc,
+            isScheduled: false);
+
+        Assert.Equal(new DateOnly(2026, 8, 11), updated.ScheduledDate);
+        Assert.Equal(ScheduledSlotStatus.Skipped, updated.ScheduledStatus);
+        Assert.Null(updated.NextAttemptUtc);
     }
 }

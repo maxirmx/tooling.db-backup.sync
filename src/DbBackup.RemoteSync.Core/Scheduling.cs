@@ -17,11 +17,27 @@ public static class SchedulePlanner
         SchedulerState state,
         DateTimeOffset utcNow,
         TimeOnly scheduledLocalTime,
-        TimeZoneInfo timeZone)
+        TimeZoneInfo timeZone,
+        bool skipDueAtStartup = false)
     {
         var localNow = TimeZoneInfo.ConvertTime(utcNow, timeZone);
         var localDate = DateOnly.FromDateTime(localNow.DateTime);
         var dueUtc = ResolveScheduledUtc(localDate, scheduledLocalTime, timeZone);
+
+        if (skipDueAtStartup && utcNow >= dueUtc && IsDue(state, localDate, utcNow))
+        {
+            state = state with
+            {
+                ScheduledDate = localDate,
+                ScheduledStatus = ScheduledSlotStatus.Skipped,
+                AttemptsCompleted = 0,
+                NextAttemptUtc = null,
+            };
+            return new(
+                ScheduledAction.None,
+                state,
+                ResolveScheduledUtc(localDate.AddDays(1), scheduledLocalTime, timeZone));
+        }
 
         if (state.ScheduledDate != localDate)
         {
@@ -53,6 +69,13 @@ public static class SchedulePlanner
             : ResolveScheduledUtc(localDate.AddDays(1), scheduledLocalTime, timeZone);
         return new(ScheduledAction.None, state, nextWake);
     }
+
+    private static bool IsDue(SchedulerState state, DateOnly localDate, DateTimeOffset utcNow) =>
+        state.ScheduledDate != localDate ||
+        state.ScheduledStatus == ScheduledSlotStatus.None ||
+        state.ScheduledStatus == ScheduledSlotStatus.Pending &&
+        state.NextAttemptUtc is { } nextAttempt &&
+        nextAttempt <= utcNow;
 
     public static SchedulerState RecordScheduledSuccess(SchedulerState state, DateOnly localDate) =>
         state with
@@ -100,6 +123,30 @@ public static class SchedulePlanner
         {
             ScheduledStatus = ScheduledSlotStatus.Exhausted,
             AttemptsCompleted = attempts,
+            NextAttemptUtc = null,
+        };
+    }
+
+    public static SchedulerState RecordCanceledRun(
+        SchedulerState state,
+        DateTimeOffset startedUtc,
+        TimeOnly scheduledLocalTime,
+        TimeZoneInfo timeZone,
+        bool isScheduled)
+    {
+        var localStarted = TimeZoneInfo.ConvertTime(startedUtc, timeZone);
+        var startedLocalDate = DateOnly.FromDateTime(localStarted.DateTime);
+        var scheduledUtc = ResolveScheduledUtc(startedLocalDate, scheduledLocalTime, timeZone);
+        if (!isScheduled && startedUtc < scheduledUtc)
+        {
+            return state;
+        }
+
+        return state with
+        {
+            ScheduledDate = isScheduled ? state.ScheduledDate ?? startedLocalDate : startedLocalDate,
+            ScheduledStatus = ScheduledSlotStatus.Skipped,
+            AttemptsCompleted = 0,
             NextAttemptUtc = null,
         };
     }

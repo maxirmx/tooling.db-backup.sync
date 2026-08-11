@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
 // All rights reserved.
 
 using System.Text.Json.Serialization;
@@ -89,6 +89,7 @@ public enum ScheduledSlotStatus
     Pending,
     Succeeded,
     Exhausted,
+    Skipped,
 }
 
 public sealed record SchedulerState
@@ -138,6 +139,15 @@ public sealed record LastRunState
     [JsonPropertyName("raceSkipped")]
     public int RaceSkipped { get; init; }
 
+    [JsonPropertyName("skippedDirectories")]
+    public int SkippedDirectories { get; init; }
+
+    [JsonPropertyName("skippedSymbolicLinks")]
+    public int SkippedSymbolicLinks { get; init; }
+
+    [JsonPropertyName("skippedSpecialEntries")]
+    public int SkippedSpecialEntries { get; init; }
+
     [JsonPropertyName("error")]
     public string? Error { get; init; }
 }
@@ -155,8 +165,22 @@ public sealed record RemoteFileEntry(
     long Length,
     DateTimeOffset LastWriteTimeUtc);
 
+public sealed record RemoteFileInventory(
+    IReadOnlyList<RemoteFileEntry> Files,
+    int SkippedDirectories,
+    int SkippedSymbolicLinks,
+    int SkippedSpecialEntries);
+
+public sealed record SynchronizationProgress(
+    string RemoteFile,
+    long DownloadedBytes,
+    long TotalBytes);
+
 public sealed record SynchronizationResult(
     int RemoteFiles,
     int AlreadyPresent,
     int Downloaded,
-    int RaceSkipped);
+    int RaceSkipped,
+    int SkippedDirectories,
+    int SkippedSymbolicLinks,
+    int SkippedSpecialEntries);

@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
 // All rights reserved.
 
 using System.IO.Pipes;
@@ -11,7 +11,9 @@ public enum ControlCommand
 {
     GetStatus,
     ReloadConfiguration,
+    ReloadAndRunNow,
     RunNow,
+    CancelRun,
 }
 
 public sealed record ControlRequest(
@@ -22,8 +24,13 @@ public sealed record ServiceStatus
 {
     public bool ConfigurationValid { get; init; }
     public bool IsRunning { get; init; }
+    public bool CancellationRequested { get; init; }
     public string? ConfigurationError { get; init; }
     public string? ActiveReason { get; init; }
+    public string? ActiveFile { get; init; }
+    public long ActiveBytesDownloaded { get; init; }
+    public long ActiveTotalBytes { get; init; }
+    public DateTimeOffset? ActiveProgressUtc { get; init; }
     public DateTimeOffset? NextAttemptUtc { get; init; }
     public int RetryNumber { get; init; }
     public LastRunState? LastRun { get; init; }

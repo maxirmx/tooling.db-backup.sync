@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
 // All rights reserved.
 
 using System.Globalization;
@@ -14,12 +14,16 @@ internal static class MessageCatalog
         {
             (true, "ConfigurationInvalid") => "Конфигурация службы недействительна: {0}",
             (true, "RunStarted") => "Запущена синхронизация ({0}).",
-            (true, "RunCompleted") => "Синхронизация завершена: загружено {0}, уже существовало {1}, пропущено из-за гонки {2}.",
+            (true, "RunCompleted") => "Синхронизация завершена: найдено файлов {0}, загружено {1}, уже существовало {2}, " +
+                "пропущено из-за гонки {3}, каталогов {4}, символических ссылок {5}, специальных объектов {6}.",
             (true, "RunFailed") => "Синхронизация завершилась ошибкой: {0}",
+            (true, "RunCanceled") => "Синхронизация остановлена пользователем.",
             (_, "ConfigurationInvalid") => "The service configuration is invalid: {0}",
             (_, "RunStarted") => "Synchronization started ({0}).",
-            (_, "RunCompleted") => "Synchronization completed: downloaded {0}, already present {1}, race-skipped {2}.",
+            (_, "RunCompleted") => "Synchronization completed: eligible files {0}, downloaded {1}, already present {2}, " +
+                "race-skipped {3}, skipped directories {4}, symbolic links {5}, special entries {6}.",
             (_, "RunFailed") => "Synchronization failed: {0}",
+            (_, "RunCanceled") => "Synchronization was stopped by the user.",
             _ => key,
         };
         return string.Format(CultureInfo.GetCultureInfo(russian ? "ru-RU" : "en-US"), format, arguments);

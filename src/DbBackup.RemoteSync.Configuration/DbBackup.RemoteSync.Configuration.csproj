@@ -11,6 +11,7 @@
     <AssemblyName>DbBackup.RemoteSync.Configuration</AssemblyName>
     <RootNamespace>DbBackup.RemoteSync.Configuration</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\..\assets\db-backup-remote-sync.ico</ApplicationIcon>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
@@ -19,5 +20,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../DbBackup.RemoteSync.Core/DbBackup.RemoteSync.Core.csproj" />
+    <Resource Include="..\..\assets\db-backup-remote-sync.ico" Link="Assets\db-backup-remote-sync.ico" />
+    <Resource Include="..\..\assets\db-backup-remote-sync.png" Link="Assets\db-backup-remote-sync.png" />
   </ItemGroup>
 </Project>
