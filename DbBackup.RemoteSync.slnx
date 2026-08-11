@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DbBackup.RemoteSync.Core/DbBackup.RemoteSync.Core.csproj" />
+    <Project Path="src/DbBackup.RemoteSync.Service/DbBackup.RemoteSync.Service.csproj" />
+    <Project Path="src/DbBackup.RemoteSync.Configuration/DbBackup.RemoteSync.Configuration.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DbBackup.RemoteSync.Core.Tests/DbBackup.RemoteSync.Core.Tests.csproj" />
+    <Project Path="tests/DbBackup.RemoteSync.Windows.Tests/DbBackup.RemoteSync.Windows.Tests.csproj" />
+    <Project Path="tests/DbBackup.RemoteSync.Sftp.Tests/DbBackup.RemoteSync.Sftp.Tests.csproj" />
+  </Folder>
+  <Folder Name="/installer/">
+    <Project Path="installer/DbBackup.RemoteSync.Installer.wixproj" />
+  </Folder>
+</Solution>

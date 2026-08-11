@@ -1,0 +1,14 @@
+<WixLocalization xmlns="http://wixtoolset.org/schemas/v4/wxl" Culture="ru-ru">
+  <String Id="Language" Value="1049" />
+  <String Id="ProductName" Value="DB Backup Remote Sync" />
+  <String Id="Manufacturer" Value="Максим Самсонов" />
+  <String Id="ProductDescription" Value="Служба односторонней загрузки резервных копий по расписанию и утилита настройки." />
+  <String Id="ServiceDisplayName" Value="DB Backup Remote Sync" />
+  <String Id="ServiceDescription" Value="Ежедневно загружает отсутствующие файлы резервных копий с доверенного сервера SFTP." />
+  <String Id="ConfigurationShortcut" Value="Настройка DB Backup Remote Sync" />
+  <String Id="ConfigurationShortcutDescription" Value="Настройка и контроль службы синхронизации удалённых резервных копий." />
+  <String Id="NewerVersionInstalled" Value="Уже установлена более новая версия DB Backup Remote Sync." />
+  <String Id="msierrSecureObjectsFailedCreateSD" Value="Не удалось создать дескриптор безопасности для [3]\\[4]. Системная ошибка: [2]" />
+  <String Id="msierrSecureObjectsFailedSet" Value="Не удалось применить дескриптор безопасности к объекту [3]. Системная ошибка: [2]" />
+  <String Id="msierrSecureObjectsUnknownType" Value="Неизвестный тип объекта [3]. Системная ошибка: [2]" />
+</WixLocalization>
