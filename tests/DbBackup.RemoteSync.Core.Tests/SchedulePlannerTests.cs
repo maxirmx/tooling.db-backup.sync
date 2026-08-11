@@ -79,4 +79,55 @@ public sealed class SchedulePlannerTests
 
         Assert.Equal(new DateTimeOffset(2026, 11, 1, 5, 30, 0, TimeSpan.Zero), utc);
     }
+
+    [Fact]
+    public void ManualSuccessBeforeDailyTimeDoesNotSatisfySlot()
+    {
+        var state = new SchedulerState();
+
+        var updated = SchedulePlanner.RecordSuccessfulRun(
+            state,
+            new DateTimeOffset(2026, 8, 11, 1, 59, 0, TimeSpan.Zero),
+            new TimeOnly(2, 0),
+            TimeZoneInfo.Utc,
+            isScheduled: false);
+
+        Assert.Equal(state, updated);
+    }
+
+    [Fact]
+    public void ManualSuccessAfterDailyTimeSatisfiesStartDateSlot()
+    {
+        var updated = SchedulePlanner.RecordSuccessfulRun(
+            new SchedulerState(),
+            new DateTimeOffset(2026, 8, 11, 2, 1, 0, TimeSpan.Zero),
+            new TimeOnly(2, 0),
+            TimeZoneInfo.Utc,
+            isScheduled: false);
+
+        Assert.Equal(new DateOnly(2026, 8, 11), updated.ScheduledDate);
+        Assert.Equal(ScheduledSlotStatus.Succeeded, updated.ScheduledStatus);
+    }
+
+    [Fact]
+    public void ScheduledRetryAfterMidnightSatisfiesOriginalSlot()
+    {
+        var state = new SchedulerState
+        {
+            ScheduledDate = new DateOnly(2026, 8, 11),
+            ScheduledStatus = ScheduledSlotStatus.Pending,
+            AttemptsCompleted = 2,
+        };
+
+        var updated = SchedulePlanner.RecordSuccessfulRun(
+            state,
+            new DateTimeOffset(2026, 8, 12, 0, 5, 0, TimeSpan.Zero),
+            new TimeOnly(23, 55),
+            TimeZoneInfo.Utc,
+            isScheduled: true);
+
+        Assert.Equal(new DateOnly(2026, 8, 11), updated.ScheduledDate);
+        Assert.Equal(ScheduledSlotStatus.Succeeded, updated.ScheduledStatus);
+        Assert.Equal(0, updated.AttemptsCompleted);
+    }
 }

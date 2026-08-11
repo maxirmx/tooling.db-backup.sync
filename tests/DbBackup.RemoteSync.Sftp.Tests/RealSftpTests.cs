@@ -5,21 +5,14 @@ namespace DbBackup.RemoteSync.Sftp.Tests;
 
 public sealed class RealSftpTests
 {
-    [Fact]
+    [SftpFact("SFTP_TEST_HOST", "SFTP_TEST_USERNAME", "SFTP_TEST_PASSWORD", "SFTP_TEST_FINGERPRINT")]
     [Trait("Category", "Integration")]
     public async Task AuthenticatesTrustsAndListsConfiguredServer()
     {
-        var host = Environment.GetEnvironmentVariable("SFTP_TEST_HOST");
-        var username = Environment.GetEnvironmentVariable("SFTP_TEST_USERNAME");
-        var password = Environment.GetEnvironmentVariable("SFTP_TEST_PASSWORD");
-        var fingerprint = Environment.GetEnvironmentVariable("SFTP_TEST_FINGERPRINT");
-        if (string.IsNullOrWhiteSpace(host) ||
-            string.IsNullOrWhiteSpace(username) ||
-            string.IsNullOrEmpty(password) ||
-            string.IsNullOrWhiteSpace(fingerprint))
-        {
-            return;
-        }
+        var host = GetRequiredEnvironmentVariable("SFTP_TEST_HOST");
+        var username = GetRequiredEnvironmentVariable("SFTP_TEST_USERNAME");
+        var password = GetRequiredEnvironmentVariable("SFTP_TEST_PASSWORD");
+        var fingerprint = GetRequiredEnvironmentVariable("SFTP_TEST_FINGERPRINT");
 
         var port = int.TryParse(Environment.GetEnvironmentVariable("SFTP_TEST_PORT"), out var parsedPort)
             ? parsedPort
@@ -58,17 +51,13 @@ public sealed class RealSftpTests
         Assert.All(files, file => Assert.DoesNotContain('\\', file.RelativePath));
     }
 
-    [Fact]
+    [SftpFact("SFTP_TEST_HOST", "SFTP_TEST_USERNAME", "SFTP_TEST_PASSWORD")]
     [Trait("Category", "Integration")]
     public async Task RejectsMismatchedHostKey()
     {
-        var host = Environment.GetEnvironmentVariable("SFTP_TEST_HOST");
-        var username = Environment.GetEnvironmentVariable("SFTP_TEST_USERNAME");
-        var password = Environment.GetEnvironmentVariable("SFTP_TEST_PASSWORD");
-        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(username) || string.IsNullOrEmpty(password))
-        {
-            return;
-        }
+        var host = GetRequiredEnvironmentVariable("SFTP_TEST_HOST");
+        var username = GetRequiredEnvironmentVariable("SFTP_TEST_USERNAME");
+        var password = GetRequiredEnvironmentVariable("SFTP_TEST_PASSWORD");
 
         var settings = new RemoteSyncSettings
         {
@@ -89,5 +78,24 @@ public sealed class RealSftpTests
         await using var client = new SftpRemoteFileClient(settings, password, _ => false);
 
         await Assert.ThrowsAnyAsync<Exception>(() => client.TestConnectionAsync(CancellationToken.None));
+    }
+
+    private static string GetRequiredEnvironmentVariable(string name) =>
+        Environment.GetEnvironmentVariable(name)
+        ?? throw new InvalidOperationException($"The required environment variable {name} disappeared after test discovery.");
+}
+
+[AttributeUsage(AttributeTargets.Method)]
+public sealed class SftpFactAttribute : FactAttribute
+{
+    public SftpFactAttribute(params string[] requiredVariables)
+    {
+        var missing = requiredVariables
+            .Where(name => string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(name)))
+            .ToArray();
+        if (missing.Length != 0)
+        {
+            Skip = $"Set {string.Join(", ", missing)} to run this integration test.";
+        }
     }
 }

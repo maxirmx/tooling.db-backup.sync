@@ -92,7 +92,7 @@ public sealed class SynchronizationEngine(
                 }
                 catch (IOException) when (File.Exists(mapped.Local))
                 {
-                    File.Delete(partialPath);
+                    TryDelete(partialPath);
                     raceSkipped++;
                     logger.LogWarning(
                         "The destination appeared during transfer and was not overwritten: {LocalFile}.",

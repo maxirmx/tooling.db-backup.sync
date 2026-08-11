@@ -63,6 +63,26 @@ public static class SchedulePlanner
             NextAttemptUtc = null,
         };
 
+    public static SchedulerState RecordSuccessfulRun(
+        SchedulerState state,
+        DateTimeOffset startedUtc,
+        TimeOnly scheduledLocalTime,
+        TimeZoneInfo timeZone,
+        bool isScheduled)
+    {
+        var localStarted = TimeZoneInfo.ConvertTime(startedUtc, timeZone);
+        var startedLocalDate = DateOnly.FromDateTime(localStarted.DateTime);
+        if (isScheduled)
+        {
+            return RecordScheduledSuccess(state, state.ScheduledDate ?? startedLocalDate);
+        }
+
+        var scheduledUtc = ResolveScheduledUtc(startedLocalDate, scheduledLocalTime, timeZone);
+        return startedUtc >= scheduledUtc
+            ? RecordScheduledSuccess(state, startedLocalDate)
+            : state;
+    }
+
     public static SchedulerState RecordScheduledFailure(SchedulerState state, DateTimeOffset utcNow)
     {
         var attempts = state.AttemptsCompleted + 1;

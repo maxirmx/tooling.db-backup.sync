@@ -230,12 +230,12 @@ public sealed class RemoteSyncWorker : BackgroundService, IServiceControl
                 context.Trust,
                 cancellationToken).ConfigureAwait(false);
             var completed = _timeProvider.GetUtcNow();
-            var localNow = TimeZoneInfo.ConvertTime(completed, TimeZoneInfo.Local);
-            var localDate = DateOnly.FromDateTime(localNow.DateTime);
-            var afterScheduledTime = completed >= SchedulePlanner.ResolveScheduledUtc(
-                localDate,
+            var updated = SchedulePlanner.RecordSuccessfulRun(
+                state,
+                started,
                 context.Settings.Schedule.GetTime(),
-                TimeZoneInfo.Local);
+                TimeZoneInfo.Local,
+                isScheduled);
             var lastRun = new LastRunState
             {
                 Reason = reason,
@@ -247,9 +247,6 @@ public sealed class RemoteSyncWorker : BackgroundService, IServiceControl
                 Downloaded = result.Downloaded,
                 RaceSkipped = result.RaceSkipped,
             };
-            var updated = isScheduled || afterScheduledTime
-                ? SchedulePlanner.RecordScheduledSuccess(state, localDate)
-                : state;
             updated = updated with { LastRun = lastRun };
             await _stateStore.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
             UpdateStatus(current => current with
@@ -338,9 +335,13 @@ public sealed class RemoteSyncWorker : BackgroundService, IServiceControl
 
     private void Wake()
     {
-        if (_wakeSignal.CurrentCount == 0)
+        try
         {
             _wakeSignal.Release();
+        }
+        catch (SemaphoreFullException)
+        {
+            // A wake-up is already pending.
         }
     }
 

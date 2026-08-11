@@ -15,7 +15,8 @@ public sealed class WindowsSecurityTests : IDisposable
     [Fact]
     public async Task DpapiCredentialRoundTripsAndFileIsAclProtected()
     {
-        var currentSid = WindowsIdentity.GetCurrent().User
+        using var currentIdentity = WindowsIdentity.GetCurrent();
+        var currentSid = currentIdentity.User
             ?? throw new InvalidOperationException("The test identity has no SID.");
         var paths = new ApplicationDataPaths(_root);
         var store = new DpapiCredentialStore(paths, currentSid);
@@ -26,7 +27,10 @@ public sealed class WindowsSecurityTests : IDisposable
         var protectedBytes = await File.ReadAllBytesAsync(paths.CredentialFile);
         Assert.True(protectedBytes.AsSpan().IndexOf("correct horse battery staple"u8) < 0);
         var security = new FileInfo(paths.CredentialFile).GetAccessControl();
-        var rules = security.GetAccessRules(true, false, typeof(SecurityIdentifier))
+        var rules = security.GetAccessRules(
+                includeExplicit: true,
+                includeInherited: true,
+                targetType: typeof(SecurityIdentifier))
             .Cast<FileSystemAccessRule>()
             .ToArray();
         Assert.Contains(rules, rule => rule.IdentityReference.Equals(currentSid));
@@ -38,16 +42,17 @@ public sealed class WindowsSecurityTests : IDisposable
     [Fact]
     public void DestinationRuleCanBeGrantedAndRemovedPrecisely()
     {
-        var currentSid = WindowsIdentity.GetCurrent().User
+        using var currentIdentity = WindowsIdentity.GetCurrent();
+        var currentSid = currentIdentity.User
             ?? throw new InvalidOperationException("The test identity has no SID.");
         var destination = Path.Combine(_root, "destination");
         var manager = new ServiceDirectoryAccessManager(currentSid);
 
         manager.GrantModify(destination);
-        Assert.True(ContainsManagedRule(destination, currentSid));
+        Assert.True(ContainsExplicitManagedRule(destination, currentSid));
 
         manager.RemoveManagedRule(destination);
-        Assert.False(ContainsManagedRule(destination, currentSid));
+        Assert.False(ContainsExplicitManagedRule(destination, currentSid));
     }
 
     [Fact]
@@ -81,11 +86,14 @@ public sealed class WindowsSecurityTests : IDisposable
         }
     }
 
-    private static bool ContainsManagedRule(string path, SecurityIdentifier sid)
+    private static bool ContainsExplicitManagedRule(string path, SecurityIdentifier sid)
     {
         var rules = new DirectoryInfo(path)
             .GetAccessControl(AccessControlSections.Access)
-            .GetAccessRules(true, false, typeof(SecurityIdentifier))
+            .GetAccessRules(
+                includeExplicit: true,
+                includeInherited: false,
+                targetType: typeof(SecurityIdentifier))
             .Cast<FileSystemAccessRule>();
         return rules.Any(rule =>
             rule.IdentityReference.Equals(sid) &&
