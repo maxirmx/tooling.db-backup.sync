@@ -29,6 +29,9 @@ try {
     dotnet restore '.\DbBackup.RemoteSync.slnx' --locked-mode
     if ($LASTEXITCODE -ne 0) { throw 'dotnet restore failed.' }
 
+    dotnet restore '.\installer\DbBackup.RemoteSync.Installer.wixproj' --locked-mode
+    if ($LASTEXITCODE -ne 0) { throw 'The installer restore failed.' }
+
     dotnet build '.\src\DbBackup.RemoteSync.Service\DbBackup.RemoteSync.Service.csproj' `
         --configuration $Configuration --no-restore -p:Version=$Version
     if ($LASTEXITCODE -ne 0) { throw 'The service build failed.' }
