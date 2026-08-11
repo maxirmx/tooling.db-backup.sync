@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
 // All rights reserved.
 
 using Microsoft.Extensions.Logging.Abstractions;
@@ -22,18 +22,61 @@ public sealed class SynchronizationEngineTests
             },
             timestamp);
         var engine = CreateEngine(remote);
+        var progress = new List<SynchronizationProgress>();
 
         var result = await engine.SynchronizeAsync(
             TestSettings.Create(temporary.Path),
             "secret",
             CreateTrust(),
-            CancellationToken.None);
+            CancellationToken.None,
+            progress.Add);
 
         Assert.Equal("local", await File.ReadAllTextAsync(Path.Combine(temporary.Path, "existing.sql")));
         Assert.Equal("new data", await File.ReadAllTextAsync(Path.Combine(temporary.Path, "nested", "new.sql")));
         Assert.Equal(1, result.AlreadyPresent);
         Assert.Equal(1, result.Downloaded);
+        Assert.Equal(2, result.RemoteFiles);
         Assert.Equal(timestamp.UtcDateTime, File.GetLastWriteTimeUtc(Path.Combine(temporary.Path, "nested", "new.sql")), TimeSpan.FromSeconds(2));
+        Assert.Equal("nested/new.sql", progress[0].RemoteFile);
+        Assert.Equal(0, progress[0].DownloadedBytes);
+        Assert.Equal(8, progress[0].TotalBytes);
+        Assert.Equal(1, progress[0].FileNumber);
+        Assert.Equal(1, progress[0].FileCount);
+        Assert.Equal(0, progress[0].CompletedFiles);
+        Assert.Equal(0, progress[0].OverallDownloadedBytes);
+        Assert.Equal(8, progress[0].OverallTotalBytes);
+        Assert.Equal(8, progress[^1].DownloadedBytes);
+        Assert.Equal(1, progress[^1].CompletedFiles);
+        Assert.Equal(8, progress[^1].OverallDownloadedBytes);
+    }
+
+    [Fact]
+    public async Task ProgressIncludesAllPendingFilesAndAggregateBytes()
+    {
+        using var temporary = new TemporaryDirectory();
+        var remote = new FakeRemoteClient(new Dictionary<string, byte[]>
+        {
+            ["first.sql"] = [1, 2],
+            ["second.sql"] = [3, 4, 5],
+        });
+        var engine = CreateEngine(remote);
+        var progress = new List<SynchronizationProgress>();
+
+        await engine.SynchronizeAsync(
+            TestSettings.Create(temporary.Path),
+            "secret",
+            CreateTrust(),
+            CancellationToken.None,
+            progress.Add);
+
+        var secondFileStart = progress.First(item =>
+            item.FileNumber == 2 && item.DownloadedBytes == 0);
+        Assert.Equal(2, secondFileStart.FileCount);
+        Assert.Equal(1, secondFileStart.CompletedFiles);
+        Assert.Equal(2, secondFileStart.OverallDownloadedBytes);
+        Assert.Equal(5, secondFileStart.OverallTotalBytes);
+        Assert.Equal(2, progress[^1].CompletedFiles);
+        Assert.Equal(5, progress[^1].OverallDownloadedBytes);
     }
 
     [Fact]
@@ -101,6 +144,29 @@ public sealed class SynchronizationEngineTests
         Assert.Empty(Directory.EnumerateFiles(temporary.Path, ".db-backup-download-*.partial"));
     }
 
+    [Fact]
+    public async Task ReturnsRemoteInventorySkipCounts()
+    {
+        using var temporary = new TemporaryDirectory();
+        var remote = new FakeRemoteClient(
+            [],
+            skippedDirectories: 2,
+            skippedSymbolicLinks: 3,
+            skippedSpecialEntries: 4);
+        var engine = CreateEngine(remote);
+
+        var result = await engine.SynchronizeAsync(
+            TestSettings.Create(temporary.Path),
+            "secret",
+            CreateTrust(),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.RemoteFiles);
+        Assert.Equal(2, result.SkippedDirectories);
+        Assert.Equal(3, result.SkippedSymbolicLinks);
+        Assert.Equal(4, result.SkippedSpecialEntries);
+    }
+
     private static SynchronizationEngine CreateEngine(FakeRemoteClient remote) =>
         new(new FakeRemoteFactory(remote), NullLogger<SynchronizationEngine>.Instance);
 
@@ -131,28 +197,42 @@ public sealed class SynchronizationEngineTests
         private readonly DateTimeOffset _timestamp;
         private readonly Action? _beforeDownloadCompletes;
         private readonly string? _failFile;
+        private readonly int _skippedDirectories;
+        private readonly int _skippedSymbolicLinks;
+        private readonly int _skippedSpecialEntries;
 
         public FakeRemoteClient(
             Dictionary<string, byte[]> files,
             DateTimeOffset? timestamp = null,
             Action? beforeDownloadCompletes = null,
-            string? failFile = null)
+            string? failFile = null,
+            int skippedDirectories = 0,
+            int skippedSymbolicLinks = 0,
+            int skippedSpecialEntries = 0)
         {
             _files = files;
             _timestamp = timestamp ?? DateTimeOffset.UtcNow;
             _beforeDownloadCompletes = beforeDownloadCompletes;
             _failFile = failFile;
+            _skippedDirectories = skippedDirectories;
+            _skippedSymbolicLinks = skippedSymbolicLinks;
+            _skippedSpecialEntries = skippedSpecialEntries;
         }
 
         public List<string> Downloaded { get; } = [];
 
-        public Task TestConnectionAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<RemoteFileInventory> ListFilesAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(new RemoteFileInventory(
+                _files
+                    .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Select(pair => new RemoteFileEntry(pair.Key, pair.Value.Length, _timestamp))
+                    .ToArray(),
+                _skippedDirectories,
+                _skippedSymbolicLinks,
+                _skippedSpecialEntries));
 
-        public Task<IReadOnlyList<RemoteFileEntry>> ListFilesAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<RemoteFileEntry>>(_files
-                .OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                .Select(pair => new RemoteFileEntry(pair.Key, pair.Value.Length, _timestamp))
-                .ToArray());
+        public Task TestFileReadAsync(RemoteFileEntry file, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
 
         public async Task DownloadFileAsync(RemoteFileEntry file, Stream destination, CancellationToken cancellationToken)
         {

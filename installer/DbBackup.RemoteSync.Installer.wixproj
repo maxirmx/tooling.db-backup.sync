@@ -13,7 +13,10 @@
     <OutputName Condition="'$(OutputName)' == ''">DB-Backup-Remote-Sync-$(Version)-$(Cultures)</OutputName>
     <ServicePublishDir Condition="'$(ServicePublishDir)' == ''">$(MSBuildThisFileDirectory)..\artifacts\publish\service</ServicePublishDir>
     <ConfigurationPublishDir Condition="'$(ConfigurationPublishDir)' == ''">$(MSBuildThisFileDirectory)..\artifacts\publish\configuration</ConfigurationPublishDir>
-    <DefineConstants>ProductVersion=$(Version);ServicePublishDir=$(ServicePublishDir);ConfigurationPublishDir=$(ConfigurationPublishDir)</DefineConstants>
+    <BrandAssetsDir Condition="'$(BrandAssetsDir)' == ''">$(MSBuildThisFileDirectory)..\assets</BrandAssetsDir>
+    <LicenseRtf Condition="'$(Cultures)' == 'ru-ru'">$(MSBuildThisFileDirectory)License.ru-ru.rtf</LicenseRtf>
+    <LicenseRtf Condition="'$(LicenseRtf)' == ''">$(MSBuildThisFileDirectory)License.rtf</LicenseRtf>
+    <DefineConstants>ProductVersion=$(Version);ServicePublishDir=$(ServicePublishDir);ConfigurationPublishDir=$(ConfigurationPublishDir);BrandAssetsDir=$(BrandAssetsDir);LicenseRtf=$(LicenseRtf)</DefineConstants>
     <OutputPath>$(MSBuildThisFileDirectory)..\artifacts\installer-staging\$(Cultures)</OutputPath>
     <SuppressValidation>false</SuppressValidation>
     <SuppressSpecificWarnings>1149</SuppressSpecificWarnings>

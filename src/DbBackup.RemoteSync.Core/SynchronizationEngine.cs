@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
 // All rights reserved.
 
 using Microsoft.Extensions.Logging;
@@ -15,7 +15,8 @@ public sealed class SynchronizationEngine(
         RemoteSyncSettings settings,
         string password,
         TrustedHostKey trust,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action<SynchronizationProgress>? progress = null)
     {
         var issues = ConfigurationValidator.Validate(settings);
         if (issues.Count != 0)
@@ -36,8 +37,20 @@ public sealed class SynchronizationEngine(
             settings,
             password,
             presented => trust.Matches(presented));
-        var remoteFiles = await remote.ListFilesAsync(cancellationToken).ConfigureAwait(false);
-        var mappedFiles = ValidateAndMap(remoteFiles, localRoot);
+        var inventory = await remote.ListFilesAsync(cancellationToken).ConfigureAwait(false);
+        logger.LogInformation(
+            "Remote inventory completed: eligible {RemoteFiles}, skipped directories {SkippedDirectories}, " +
+            "symbolic links {SkippedSymbolicLinks}, special entries {SkippedSpecialEntries}.",
+            inventory.Files.Count,
+            inventory.SkippedDirectories,
+            inventory.SkippedSymbolicLinks,
+            inventory.SkippedSpecialEntries);
+        if (inventory.Files.Count == 0)
+        {
+            logger.LogWarning("The remote inventory contained no eligible regular files.");
+        }
+
+        var mappedFiles = ValidateAndMap(inventory.Files, localRoot);
         var missing = new List<(RemoteFileEntry Remote, string Local)>();
         var alreadyPresent = 0;
 
@@ -60,13 +73,27 @@ public sealed class SynchronizationEngine(
 
         var downloaded = 0;
         var raceSkipped = 0;
-        foreach (var mapped in missing)
+        var overallTotalBytes = missing.Aggregate(
+            0L,
+            (total, mapped) => checked(total + mapped.Remote.Length));
+        long completedBytes = 0;
+        for (var fileIndex = 0; fileIndex < missing.Count; fileIndex++)
         {
+            var mapped = missing[fileIndex];
             cancellationToken.ThrowIfCancellationRequested();
             var parent = Path.GetDirectoryName(mapped.Local)
                 ?? throw new InvalidOperationException("The destination file has no parent directory.");
             Directory.CreateDirectory(parent);
             var partialPath = Path.Combine(parent, $".db-backup-download-{Guid.NewGuid():N}.partial");
+            progress?.Invoke(new SynchronizationProgress(
+                mapped.Remote.RelativePath,
+                DownloadedBytes: 0,
+                TotalBytes: mapped.Remote.Length,
+                FileNumber: fileIndex + 1,
+                FileCount: missing.Count,
+                CompletedFiles: fileIndex,
+                OverallDownloadedBytes: completedBytes,
+                OverallTotalBytes: overallTotalBytes));
 
             try
             {
@@ -78,10 +105,32 @@ public sealed class SynchronizationEngine(
                     1024 * 128,
                     FileOptions.Asynchronous | FileOptions.SequentialScan))
                 {
-                    await remote.DownloadFileAsync(mapped.Remote, output, cancellationToken)
+                    var progressOutput = new ProgressWriteStream(
+                        output,
+                        bytes => progress?.Invoke(new SynchronizationProgress(
+                            mapped.Remote.RelativePath,
+                            bytes,
+                            mapped.Remote.Length,
+                            FileNumber: fileIndex + 1,
+                            FileCount: missing.Count,
+                            CompletedFiles: fileIndex,
+                            OverallDownloadedBytes: checked(completedBytes + bytes),
+                            OverallTotalBytes: overallTotalBytes)));
+                    await remote.DownloadFileAsync(mapped.Remote, progressOutput, cancellationToken)
                         .ConfigureAwait(false);
                     await output.FlushAsync(cancellationToken).ConfigureAwait(false);
                 }
+
+                completedBytes = checked(completedBytes + mapped.Remote.Length);
+                progress?.Invoke(new SynchronizationProgress(
+                    mapped.Remote.RelativePath,
+                    DownloadedBytes: mapped.Remote.Length,
+                    TotalBytes: mapped.Remote.Length,
+                    FileNumber: fileIndex + 1,
+                    FileCount: missing.Count,
+                    CompletedFiles: fileIndex + 1,
+                    OverallDownloadedBytes: completedBytes,
+                    OverallTotalBytes: overallTotalBytes));
 
                 File.SetLastWriteTimeUtc(partialPath, mapped.Remote.LastWriteTimeUtc.UtcDateTime);
                 try
@@ -113,7 +162,14 @@ public sealed class SynchronizationEngine(
             }
         }
 
-        return new(remoteFiles.Count, alreadyPresent, downloaded, raceSkipped);
+        return new(
+            inventory.Files.Count,
+            alreadyPresent,
+            downloaded,
+            raceSkipped,
+            inventory.SkippedDirectories,
+            inventory.SkippedSymbolicLinks,
+            inventory.SkippedSpecialEntries);
     }
 
     public static IReadOnlyList<(RemoteFileEntry Remote, string Local)> ValidateAndMap(
@@ -183,6 +239,62 @@ public sealed class SynchronizationEngine(
         }
         catch (UnauthorizedAccessException)
         {
+        }
+    }
+
+    private sealed class ProgressWriteStream(Stream inner, Action<long> report) : Stream
+    {
+        private const long ReportIntervalBytes = 1024 * 1024;
+        private long _bytesWritten;
+        private long _nextReport = ReportIntervalBytes;
+
+        public override bool CanRead => inner.CanRead;
+        public override bool CanSeek => inner.CanSeek;
+        public override bool CanWrite => inner.CanWrite;
+        public override long Length => inner.Length;
+        public override long Position
+        {
+            get => inner.Position;
+            set => inner.Position = value;
+        }
+
+        public override void Flush() => inner.Flush();
+
+        public override Task FlushAsync(CancellationToken cancellationToken) =>
+            inner.FlushAsync(cancellationToken);
+
+        public override int Read(byte[] buffer, int offset, int count) =>
+            inner.Read(buffer, offset, count);
+
+        public override long Seek(long offset, SeekOrigin origin) => inner.Seek(offset, origin);
+
+        public override void SetLength(long value) => inner.SetLength(value);
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            inner.Write(buffer, offset, count);
+            RecordWrite(count);
+        }
+
+        public override async ValueTask WriteAsync(
+            ReadOnlyMemory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            await inner.WriteAsync(buffer, cancellationToken).ConfigureAwait(false);
+            RecordWrite(buffer.Length);
+        }
+
+        private void RecordWrite(int count)
+        {
+            _bytesWritten = checked(_bytesWritten + count);
+            if (_bytesWritten == count || _bytesWritten >= _nextReport)
+            {
+                report(_bytesWritten);
+                while (_nextReport <= _bytesWritten)
+                {
+                    _nextReport += ReportIntervalBytes;
+                }
+            }
         }
     }
 }

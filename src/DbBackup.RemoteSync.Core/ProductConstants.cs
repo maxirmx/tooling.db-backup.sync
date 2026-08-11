@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
 // All rights reserved.
 
 namespace DbBackup.RemoteSync;
@@ -10,7 +10,7 @@ public static class ProductConstants
     public const string ServiceAccount = @"NT SERVICE\DbBackupRemoteSync";
     public const string EventLogSource = ServiceName;
     public const string PipeName = "DbBackupRemoteSync.Control.v1";
-    public const int ControlProtocolVersion = 1;
+    public const int ControlProtocolVersion = 5;
     public const int SettingsSchemaVersion = 1;
     public const int TrustSchemaVersion = 1;
     public const int StateSchemaVersion = 1;
@@ -31,6 +31,7 @@ public sealed class ApplicationDataPaths
     public string CredentialFile => Path.Combine(RootDirectory, "credential.dat");
     public string TrustFile => Path.Combine(RootDirectory, "trusted-host-key.json");
     public string StateFile => Path.Combine(RootDirectory, "state.json");
+    public string DiagnosticLogFile => Path.Combine(RootDirectory, "service.log");
 
     public static ApplicationDataPaths Default { get; } = new(
         Path.Combine(

@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
 // All rights reserved.
 
 using Microsoft.Extensions.Hosting;
@@ -11,6 +11,7 @@ public sealed class RemoteSyncWorker : BackgroundService, IServiceControl
     private static readonly TimeSpan IdlePollInterval = TimeSpan.FromSeconds(15);
     private readonly object _gate = new();
     private readonly SemaphoreSlim _wakeSignal = new(0, 1);
+    private readonly ApplicationDataPaths _paths;
     private readonly SettingsStore _settingsStore;
     private readonly HostTrustStore _trustStore;
     private readonly SchedulerStateStore _stateStore;
@@ -20,8 +21,11 @@ public sealed class RemoteSyncWorker : BackgroundService, IServiceControl
     private readonly ILogger<RemoteSyncWorker> _logger;
     private ServiceStatus _status = new() { ConfigurationError = "MissingSettings" };
     private bool _manualPending;
+    private bool _firstScheduleEvaluation = true;
+    private CancellationTokenSource? _activeRunCancellation;
 
     public RemoteSyncWorker(
+        ApplicationDataPaths paths,
         SettingsStore settingsStore,
         HostTrustStore trustStore,
         SchedulerStateStore stateStore,
@@ -30,6 +34,7 @@ public sealed class RemoteSyncWorker : BackgroundService, IServiceControl
         TimeProvider timeProvider,
         ILogger<RemoteSyncWorker> logger)
     {
+        _paths = paths;
         _settingsStore = settingsStore;
         _trustStore = trustStore;
         _stateStore = stateStore;
@@ -61,6 +66,22 @@ public sealed class RemoteSyncWorker : BackgroundService, IServiceControl
         return Accepted("ReloadQueued");
     }
 
+    public ControlResponse RequestReloadAndRunNow()
+    {
+        lock (_gate)
+        {
+            if (_status.IsRunning || _manualPending)
+            {
+                return Rejected("AlreadyRunning", "A synchronization is already active or queued.");
+            }
+
+            _manualPending = true;
+        }
+
+        Wake();
+        return Accepted("ReloadAndRunQueued");
+    }
+
     public ControlResponse RequestRunNow()
     {
         lock (_gate)
@@ -82,9 +103,29 @@ public sealed class RemoteSyncWorker : BackgroundService, IServiceControl
         return Accepted("RunQueued");
     }
 
+    public ControlResponse RequestCancel()
+    {
+        lock (_gate)
+        {
+            if (!_status.IsRunning || _activeRunCancellation is null)
+            {
+                return Rejected("NotRunning", "No synchronization is currently active.");
+            }
+
+            if (_status.CancellationRequested)
+            {
+                return Accepted("CancellationAlreadyRequested", _status);
+            }
+
+            _status = _status with { CancellationRequested = true };
+            _activeRunCancellation.Cancel();
+            return Accepted("CancellationRequested", _status);
+        }
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        Directory.CreateDirectory(ApplicationDataPaths.Default.RootDirectory);
+        Directory.CreateDirectory(_paths.RootDirectory);
         while (!stoppingToken.IsCancellationRequested)
         {
             var delay = IdlePollInterval;
@@ -97,36 +138,84 @@ public sealed class RemoteSyncWorker : BackgroundService, IServiceControl
                     continue;
                 }
 
-                bool manual;
-                lock (_gate)
-                {
-                    manual = _manualPending;
-                    _manualPending = false;
-                }
-
                 var state = await _stateStore.LoadAsync(stoppingToken).ConfigureAwait(false);
                 var now = _timeProvider.GetUtcNow();
-                if (manual)
-                {
-                    await ExecuteRunAsync(context, state, "manual", isScheduled: false, stoppingToken)
-                        .ConfigureAwait(false);
-                    continue;
-                }
-
+                var skipDueAtStartup = _firstScheduleEvaluation;
+                _firstScheduleEvaluation = false;
                 var decision = SchedulePlanner.Evaluate(
                     state,
                     now,
                     context.Settings.Schedule.GetTime(),
-                    TimeZoneInfo.Local);
+                    TimeZoneInfo.Local,
+                    skipDueAtStartup);
                 if (decision.State != state)
                 {
                     await _stateStore.SaveAsync(decision.State, stoppingToken).ConfigureAwait(false);
                 }
 
-                if (decision.Action == ScheduledAction.RunNow)
+                string? runReason = null;
+                var isScheduled = false;
+                CancellationTokenSource? runCancellation = null;
+                lock (_gate)
                 {
-                    await ExecuteRunAsync(context, decision.State, "scheduled", isScheduled: true, stoppingToken)
-                        .ConfigureAwait(false);
+                    if (_manualPending)
+                    {
+                        _manualPending = false;
+                        runReason = "manual";
+                    }
+                    else if (decision.Action == ScheduledAction.RunNow)
+                    {
+                        runReason = "scheduled";
+                        isScheduled = true;
+                    }
+
+                    if (runReason is not null)
+                    {
+                        runCancellation = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                        _activeRunCancellation = runCancellation;
+                        _status = _status with
+                        {
+                            IsRunning = true,
+                            CancellationRequested = false,
+                            ActiveReason = runReason,
+                            ActiveFile = null,
+                            ActiveBytesDownloaded = 0,
+                            ActiveTotalBytes = 0,
+                            ActiveFileNumber = 0,
+                            ActiveFileCount = 0,
+                            ActiveCompletedFiles = 0,
+                            ActiveOverallBytesDownloaded = 0,
+                            ActiveOverallTotalBytes = 0,
+                            ActiveProgressUtc = null,
+                            NextAttemptUtc = null,
+                        };
+                    }
+                }
+
+                if (runReason is not null)
+                {
+                    try
+                    {
+                        await ExecuteRunAsync(
+                            context,
+                            decision.State,
+                            runReason,
+                            isScheduled,
+                            runCancellation!.Token,
+                            stoppingToken).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        lock (_gate)
+                        {
+                            if (ReferenceEquals(_activeRunCancellation, runCancellation))
+                            {
+                                _activeRunCancellation = null;
+                            }
+                        }
+
+                        runCancellation!.Dispose();
+                    }
                     continue;
                 }
 
@@ -204,15 +293,10 @@ public sealed class RemoteSyncWorker : BackgroundService, IServiceControl
         SchedulerState state,
         string reason,
         bool isScheduled,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        CancellationToken stoppingToken)
     {
         var started = _timeProvider.GetUtcNow();
-        UpdateStatus(current => current with
-        {
-            IsRunning = true,
-            ActiveReason = reason,
-            NextAttemptUtc = null,
-        });
         _logger.LogInformation(
             1000,
             MessageCatalog.Get(
@@ -228,7 +312,19 @@ public sealed class RemoteSyncWorker : BackgroundService, IServiceControl
                 context.Settings,
                 password,
                 context.Trust,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                progress => UpdateStatus(current => current with
+                {
+                    ActiveFile = progress.RemoteFile,
+                    ActiveBytesDownloaded = progress.DownloadedBytes,
+                    ActiveTotalBytes = progress.TotalBytes,
+                    ActiveFileNumber = progress.FileNumber,
+                    ActiveFileCount = progress.FileCount,
+                    ActiveCompletedFiles = progress.CompletedFiles,
+                    ActiveOverallBytesDownloaded = progress.OverallDownloadedBytes,
+                    ActiveOverallTotalBytes = progress.OverallTotalBytes,
+                    ActiveProgressUtc = _timeProvider.GetUtcNow(),
+                })).ConfigureAwait(false);
             var completed = _timeProvider.GetUtcNow();
             var updated = SchedulePlanner.RecordSuccessfulRun(
                 state,
@@ -246,13 +342,26 @@ public sealed class RemoteSyncWorker : BackgroundService, IServiceControl
                 AlreadyPresent = result.AlreadyPresent,
                 Downloaded = result.Downloaded,
                 RaceSkipped = result.RaceSkipped,
+                SkippedDirectories = result.SkippedDirectories,
+                SkippedSymbolicLinks = result.SkippedSymbolicLinks,
+                SkippedSpecialEntries = result.SkippedSpecialEntries,
             };
             updated = updated with { LastRun = lastRun };
             await _stateStore.SaveAsync(updated, cancellationToken).ConfigureAwait(false);
             UpdateStatus(current => current with
             {
                 IsRunning = false,
+                CancellationRequested = false,
                 ActiveReason = null,
+                ActiveFile = null,
+                ActiveBytesDownloaded = 0,
+                ActiveTotalBytes = 0,
+                ActiveFileNumber = 0,
+                ActiveFileCount = 0,
+                ActiveCompletedFiles = 0,
+                ActiveOverallBytesDownloaded = 0,
+                ActiveOverallTotalBytes = 0,
+                ActiveProgressUtc = null,
                 LastRun = lastRun,
                 RetryNumber = 0,
             });
@@ -261,14 +370,60 @@ public sealed class RemoteSyncWorker : BackgroundService, IServiceControl
                 MessageCatalog.Get(
                     context.Settings.UiCulture,
                     "RunCompleted",
+                    result.RemoteFiles,
                     result.Downloaded,
                     result.AlreadyPresent,
-                    result.RaceSkipped));
+                    result.RaceSkipped,
+                    result.SkippedDirectories,
+                    result.SkippedSymbolicLinks,
+                    result.SkippedSpecialEntries));
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            UpdateStatus(current => current with
+            {
+                IsRunning = false,
+                CancellationRequested = false,
+                ActiveReason = null,
+                ActiveFile = null,
+                ActiveBytesDownloaded = 0,
+                ActiveTotalBytes = 0,
+                ActiveFileNumber = 0,
+                ActiveFileCount = 0,
+                ActiveCompletedFiles = 0,
+                ActiveOverallBytesDownloaded = 0,
+                ActiveOverallTotalBytes = 0,
+                ActiveProgressUtc = null,
+            });
+            throw;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            UpdateStatus(current => current with { IsRunning = false, ActiveReason = null });
-            throw;
+            var updated = SchedulePlanner.RecordCanceledRun(
+                state,
+                started,
+                context.Settings.Schedule.GetTime(),
+                TimeZoneInfo.Local,
+                isScheduled);
+            await _stateStore.SaveAsync(updated, stoppingToken).ConfigureAwait(false);
+            UpdateStatus(current => current with
+            {
+                IsRunning = false,
+                CancellationRequested = false,
+                ActiveReason = null,
+                ActiveFile = null,
+                ActiveBytesDownloaded = 0,
+                ActiveTotalBytes = 0,
+                ActiveFileNumber = 0,
+                ActiveFileCount = 0,
+                ActiveCompletedFiles = 0,
+                ActiveOverallBytesDownloaded = 0,
+                ActiveOverallTotalBytes = 0,
+                ActiveProgressUtc = null,
+                NextAttemptUtc = updated.NextAttemptUtc,
+                RetryNumber = 0,
+            });
+            _logger.LogInformation(1003, MessageCatalog.Get(context.Settings.UiCulture, "RunCanceled"));
         }
         catch (Exception exception)
         {
@@ -290,7 +445,17 @@ public sealed class RemoteSyncWorker : BackgroundService, IServiceControl
             UpdateStatus(current => current with
             {
                 IsRunning = false,
+                CancellationRequested = false,
                 ActiveReason = null,
+                ActiveFile = null,
+                ActiveBytesDownloaded = 0,
+                ActiveTotalBytes = 0,
+                ActiveFileNumber = 0,
+                ActiveFileCount = 0,
+                ActiveCompletedFiles = 0,
+                ActiveOverallBytesDownloaded = 0,
+                ActiveOverallTotalBytes = 0,
+                ActiveProgressUtc = null,
                 LastRun = lastRun,
                 NextAttemptUtc = updated.NextAttemptUtc,
                 RetryNumber = updated.AttemptsCompleted,

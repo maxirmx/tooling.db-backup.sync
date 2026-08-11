@@ -1,11 +1,19 @@
-﻿// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
 // All rights reserved.
+
+using System.Security.Cryptography;
 
 namespace DbBackup.RemoteSync.Sftp.Tests;
 
 public sealed class RealSftpTests
 {
-    [SftpFact("SFTP_TEST_HOST", "SFTP_TEST_USERNAME", "SFTP_TEST_PASSWORD", "SFTP_TEST_FINGERPRINT")]
+    [SftpFact(
+        "SFTP_TEST_HOST",
+        "SFTP_TEST_USERNAME",
+        "SFTP_TEST_PASSWORD",
+        "SFTP_TEST_FINGERPRINT",
+        "SFTP_TEST_EXPECTED_FILE",
+        "SFTP_TEST_EXPECTED_SHA256")]
     [Trait("Category", "Integration")]
     public async Task AuthenticatesTrustsAndListsConfiguredServer()
     {
@@ -13,6 +21,8 @@ public sealed class RealSftpTests
         var username = GetRequiredEnvironmentVariable("SFTP_TEST_USERNAME");
         var password = GetRequiredEnvironmentVariable("SFTP_TEST_PASSWORD");
         var fingerprint = GetRequiredEnvironmentVariable("SFTP_TEST_FINGERPRINT");
+        var expectedFile = GetRequiredEnvironmentVariable("SFTP_TEST_EXPECTED_FILE").Replace('\\', '/');
+        var expectedSha256 = GetRequiredEnvironmentVariable("SFTP_TEST_EXPECTED_SHA256");
 
         var port = int.TryParse(Environment.GetEnvironmentVariable("SFTP_TEST_PORT"), out var parsedPort)
             ? parsedPort
@@ -43,12 +53,17 @@ public sealed class RealSftpTests
                 return key.Sha256Fingerprint == fingerprint;
             });
 
-        await client.TestConnectionAsync(CancellationToken.None);
-        var files = await client.ListFilesAsync(CancellationToken.None);
+        var inventory = await client.ListFilesAsync(CancellationToken.None);
+        var file = Assert.Single(inventory.Files, candidate => candidate.RelativePath == expectedFile);
+        await client.TestFileReadAsync(file, CancellationToken.None);
+        await using var content = new MemoryStream();
+        await client.DownloadFileAsync(file, content, CancellationToken.None);
+        var actualSha256 = Convert.ToHexStringLower(SHA256.HashData(content.ToArray()));
 
         Assert.NotNull(presented);
         Assert.Equal(fingerprint, presented.Sha256Fingerprint);
-        Assert.All(files, file => Assert.DoesNotContain('\\', file.RelativePath));
+        Assert.Equal(expectedSha256, actualSha256, ignoreCase: true);
+        Assert.All(inventory.Files, candidate => Assert.DoesNotContain('\\', candidate.RelativePath));
     }
 
     [SftpFact("SFTP_TEST_HOST", "SFTP_TEST_USERNAME", "SFTP_TEST_PASSWORD")]
@@ -77,7 +92,7 @@ public sealed class RealSftpTests
         };
         await using var client = new SftpRemoteFileClient(settings, password, _ => false);
 
-        await Assert.ThrowsAnyAsync<Exception>(() => client.TestConnectionAsync(CancellationToken.None));
+        await Assert.ThrowsAnyAsync<Exception>(() => client.ListFilesAsync(CancellationToken.None));
     }
 
     private static string GetRequiredEnvironmentVariable(string name) =>

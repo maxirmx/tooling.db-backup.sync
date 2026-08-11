@@ -20,7 +20,11 @@
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <ui:WixUI Id="WixUI_Minimal" />
-    <WixVariable Id="WixUILicenseRtf" Value="$(sys.SOURCEFILEDIR)License.rtf" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(var.BrandAssetsDir)\installer-banner.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(var.BrandAssetsDir)\installer-dialog.bmp" />
+    <Icon Id="ProductIcon.ico" SourceFile="$(var.BrandAssetsDir)\db-backup-remote-sync.ico" />
+    <Property Id="ARPPRODUCTICON" Value="ProductIcon.ico" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="DB Backup Remote Sync">
@@ -58,15 +62,7 @@
         <Component Id="ConfigurationComponent" Guid="C0B9171E-E755-4FD8-BE41-7B34F8C0F610" Bitness="always64">
           <File Id="ConfigurationExecutable"
                 Source="$(var.ConfigurationPublishDir)\DbBackup.RemoteSync.Configuration.exe"
-                KeyPath="yes">
-            <Shortcut Id="ConfigurationShortcut"
-                      Directory="ApplicationProgramsFolder"
-                      Name="!(loc.ConfigurationShortcut)"
-                      Description="!(loc.ConfigurationShortcutDescription)"
-                      WorkingDirectory="INSTALLFOLDER"
-                      Advertise="yes" />
-          </File>
-          <RemoveFolder Id="RemoveProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
+                KeyPath="yes" />
         </Component>
 
         <Component Id="EventSourceComponent" Guid="A73133D8-C28C-4DE3-B208-F3299D6C1EF1" Bitness="always64">
@@ -84,7 +80,24 @@
     </StandardDirectory>
 
     <StandardDirectory Id="ProgramMenuFolder">
-      <Directory Id="ApplicationProgramsFolder" Name="DB Backup Remote Sync" />
+      <Directory Id="ApplicationProgramsFolder" Name="DB Backup Remote Sync">
+        <Component Id="ConfigurationShortcutComponent" Guid="AECE4B88-63D5-45FA-9448-B93970040422">
+          <Shortcut Id="ConfigurationShortcut"
+                    Name="!(loc.ConfigurationShortcut)"
+                    Description="!(loc.ConfigurationShortcutDescription)"
+                    Target="[INSTALLFOLDER]DbBackup.RemoteSync.Configuration.exe"
+                    WorkingDirectory="INSTALLFOLDER"
+                    Icon="ProductIcon.ico"
+                    Advertise="no" />
+          <RemoveFolder Id="RemoveProgramsFolder" On="uninstall" />
+          <RegistryValue Root="HKCU"
+                         Key="Software\DB Backup Remote Sync"
+                         Name="ConfigurationShortcut"
+                         Type="integer"
+                         Value="1"
+                         KeyPath="yes" />
+        </Component>
+      </Directory>
     </StandardDirectory>
 
     <StandardDirectory Id="CommonAppDataFolder">
@@ -109,6 +122,7 @@
     <Feature Id="MainFeature" Title="!(loc.ProductName)" Level="1">
       <ComponentRef Id="ServiceComponent" />
       <ComponentRef Id="ConfigurationComponent" />
+      <ComponentRef Id="ConfigurationShortcutComponent" />
       <ComponentRef Id="EventSourceComponent" />
       <ComponentRef Id="DataDirectoryComponent" />
     </Feature>

@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
 // All rights reserved.
 
 using System.IO.Pipes;
@@ -81,7 +81,9 @@ public sealed class NamedPipeControlServer(
                 {
                     ControlCommand.GetStatus => control.GetStatus(),
                     ControlCommand.ReloadConfiguration => control.RequestReload(),
+                    ControlCommand.ReloadAndRunNow => control.RequestReloadAndRunNow(),
                     ControlCommand.RunNow => control.RequestRunNow(),
+                    ControlCommand.CancelRun => control.RequestCancel(),
                     _ => new ControlResponse(
                         ProductConstants.ControlProtocolVersion,
                         false,
