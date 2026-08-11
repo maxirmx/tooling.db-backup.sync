@@ -1,0 +1,64 @@
+﻿<!--
+  Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+  All rights reserved.
+-->
+
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+  <sys:String x:Key="WindowTitle">DB Backup Remote Sync Configuration</sys:String>
+  <sys:String x:Key="ConnectionGroup">Connection and destination</sys:String>
+  <sys:String x:Key="Host">Remote host</sys:String>
+  <sys:String x:Key="Port">SSH port</sys:String>
+  <sys:String x:Key="Username">Username</sys:String>
+  <sys:String x:Key="Password">Password</sys:String>
+  <sys:String x:Key="PasswordHint">Leave empty to keep the stored password</sys:String>
+  <sys:String x:Key="RemoteFolder">Remote folder</sys:String>
+  <sys:String x:Key="LocalFolder">Local folder</sys:String>
+  <sys:String x:Key="Browse">Browse…</sys:String>
+  <sys:String x:Key="Recursive">Include subfolders</sys:String>
+  <sys:String x:Key="DailyTime">Daily local time (HH:mm)</sys:String>
+  <sys:String x:Key="Language">Language</sys:String>
+  <sys:String x:Key="English">English</sys:String>
+  <sys:String x:Key="Russian">Русский</sys:String>
+  <sys:String x:Key="TrustedKey">Trusted host key</sys:String>
+  <sys:String x:Key="NotTrusted">Not trusted</sys:String>
+  <sys:String x:Key="TestTrust">Test and trust</sys:String>
+  <sys:String x:Key="SaveApply">Save and apply</sys:String>
+  <sys:String x:Key="StatusGroup">Service status</sys:String>
+  <sys:String x:Key="Refresh">Refresh</sys:String>
+  <sys:String x:Key="RunNow">Run now</sys:String>
+  <sys:String x:Key="OpenLogs">Open Event Viewer</sys:String>
+  <sys:String x:Key="ServiceUnavailable">Service control channel is unavailable.</sys:String>
+  <sys:String x:Key="ConfigurationValid">Configuration is valid.</sys:String>
+  <sys:String x:Key="ConfigurationInvalid">Configuration error: {0}</sys:String>
+  <sys:String x:Key="Running">Synchronization is running ({0}).</sys:String>
+  <sys:String x:Key="Idle">Service is idle.</sys:String>
+  <sys:String x:Key="NextAttempt">Next attempt: {0}</sys:String>
+  <sys:String x:Key="RetryNumber">Completed failed attempts for this slot: {0}</sys:String>
+  <sys:String x:Key="LastSucceeded">Last run succeeded at {0}; downloaded {1}, already present {2}, race-skipped {3}.</sys:String>
+  <sys:String x:Key="LastFailed">Last run failed at {0}: {1}</sys:String>
+  <sys:String x:Key="InvalidFields">Please correct these settings: {0}</sys:String>
+  <sys:String x:Key="PasswordRequired">Enter a password before testing or saving.</sys:String>
+  <sys:String x:Key="TrustRequired">Test the connection and trust the host key before saving.</sys:String>
+  <sys:String x:Key="TrustPrompt">Trust this new SSH host key?&#x0a;&#x0a;Algorithm: {0}&#x0a;Fingerprint: {1}</sys:String>
+  <sys:String x:Key="ReplaceTrustPrompt">WARNING: the SSH host key changed. Replace the trusted key?&#x0a;&#x0a;Old: {0}&#x0a;New: {1}</sys:String>
+  <sys:String x:Key="ConnectionSucceeded">Connection, authentication, and remote-folder listing succeeded.</sys:String>
+  <sys:String x:Key="Saved">Configuration was saved and queued for service reload.</sys:String>
+  <sys:String x:Key="BusySave">Wait for the active synchronization to finish before changing configuration.</sys:String>
+  <sys:String x:Key="CommandRejected">The service rejected the command: {0}</sys:String>
+  <sys:String x:Key="RunQueued">Synchronization was queued.</sys:String>
+  <sys:String x:Key="OperationFailed">Operation failed: {0}</sys:String>
+  <sys:String x:Key="UnsupportedSchema">unsupported data schema</sys:String>
+  <sys:String x:Key="InvalidHost">invalid remote host</sys:String>
+  <sys:String x:Key="InvalidPort">invalid SSH port</sys:String>
+  <sys:String x:Key="InvalidUsername">invalid username</sys:String>
+  <sys:String x:Key="InvalidRemoteFolder">remote folder must be an absolute Linux path</sys:String>
+  <sys:String x:Key="InvalidLocalFolder">local folder must be an absolute local path</sys:String>
+  <sys:String x:Key="DriveRootNotAllowed">a drive root cannot be the local folder</sys:String>
+  <sys:String x:Key="InvalidDailyTime">daily time must use HH:mm</sys:String>
+  <sys:String x:Key="InvalidCulture">unsupported interface language</sys:String>
+  <sys:String x:Key="MissingSettings">settings have not been saved</sys:String>
+  <sys:String x:Key="MissingCredential">the password has not been saved</sys:String>
+  <sys:String x:Key="MissingOrMismatchedHostTrust">the host key is untrusted or belongs to another endpoint</sys:String>
+</ResourceDictionary>

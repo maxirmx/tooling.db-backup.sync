@@ -1,0 +1,77 @@
+﻿# Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+# All rights reserved.
+
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: MSI version in MAJOR.MINOR.PATCH form
+        required: true
+        default: 0.1.0
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $version = if ('${{ github.event_name }}' -eq 'push') {
+            '${{ github.ref_name }}'.TrimStart('v')
+          } else {
+            '${{ inputs.version }}'
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Release version must be MAJOR.MINOR.PATCH: $version"
+          }
+          "value=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Build, test, and package
+        shell: pwsh
+        run: ./eng/build.ps1 -Version '${{ steps.version.outputs.value }}'
+
+      - name: Smoke-test MSI
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem ./artifacts/package -Recurse -Filter '*-en-US.msi' | Select-Object -First 1
+          if ($null -eq $msi) { throw 'English MSI was not produced.' }
+          ./eng/smoke-installer.ps1 -MsiPath $msi.FullName
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DB-Backup-Remote-Sync-${{ steps.version.outputs.value }}
+          path: |
+            artifacts/package/**/*.msi
+            artifacts/package/**/*.sha256
+          if-no-files-found: error
+
+      - name: Create release and upload packages
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}'
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --verify-tag --generate-notes --title "DB Backup Remote Sync $tag"
+          }
+          Get-ChildItem ./artifacts/package -Recurse -File |
+            Where-Object { $_.Extension -eq '.msi' -or $_.Name.EndsWith('.sha256') } |
+            ForEach-Object { gh release upload $tag $_.FullName --clobber }

@@ -1,0 +1,96 @@
+﻿<!--
+  Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+  All rights reserved.
+-->
+
+<Window x:Class="DbBackup.RemoteSync.Configuration.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource WindowTitle}"
+        Width="780" Height="760" MinWidth="680" MinHeight="640"
+        WindowStartupLocation="CenterScreen">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <Grid Margin="18">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+
+      <GroupBox Grid.Row="0" Header="{DynamicResource ConnectionGroup}" Padding="12">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="190" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
+
+          <Label Grid.Row="0" Content="{DynamicResource Host}" VerticalAlignment="Center" />
+          <TextBox x:Name="HostText" Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" Margin="4" />
+
+          <Label Grid.Row="1" Content="{DynamicResource Port}" VerticalAlignment="Center" />
+          <TextBox x:Name="PortText" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="4" Width="100" HorizontalAlignment="Left" />
+
+          <Label Grid.Row="2" Content="{DynamicResource Username}" VerticalAlignment="Center" />
+          <TextBox x:Name="UsernameText" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="4" />
+
+          <Label Grid.Row="3" Content="{DynamicResource Password}" VerticalAlignment="Center" />
+          <StackPanel Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Margin="4">
+            <PasswordBox x:Name="PasswordInput" />
+            <TextBlock Text="{DynamicResource PasswordHint}" Foreground="Gray" FontSize="11" Margin="1,3,0,0" />
+          </StackPanel>
+
+          <Label Grid.Row="4" Content="{DynamicResource RemoteFolder}" VerticalAlignment="Center" />
+          <TextBox x:Name="RemoteFolderText" Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" Margin="4" />
+
+          <Label Grid.Row="5" Content="{DynamicResource LocalFolder}" VerticalAlignment="Center" />
+          <TextBox x:Name="LocalFolderText" Grid.Row="5" Grid.Column="1" Margin="4" />
+          <Button Grid.Row="5" Grid.Column="2" Content="{DynamicResource Browse}" Click="Browse_Click" Padding="14,4" Margin="4" />
+
+          <Label Grid.Row="6" Content="{DynamicResource DailyTime}" VerticalAlignment="Center" />
+          <TextBox x:Name="DailyTimeText" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2" Margin="4" Width="100" HorizontalAlignment="Left" />
+
+          <Label Grid.Row="7" Content="{DynamicResource Language}" VerticalAlignment="Center" />
+          <ComboBox x:Name="LanguageCombo" Grid.Row="7" Grid.Column="1" Grid.ColumnSpan="2" Margin="4" Width="180" HorizontalAlignment="Left" SelectionChanged="Language_SelectionChanged">
+            <ComboBoxItem Tag="en" Content="{DynamicResource English}" />
+            <ComboBoxItem Tag="ru" Content="{DynamicResource Russian}" />
+          </ComboBox>
+
+          <CheckBox x:Name="RecursiveCheck" Grid.Row="8" Grid.Column="1" Grid.ColumnSpan="2" Content="{DynamicResource Recursive}" Margin="4,8" />
+
+          <Label Grid.Row="9" Content="{DynamicResource TrustedKey}" VerticalAlignment="Top" />
+          <TextBlock x:Name="TrustedKeyText" Grid.Row="9" Grid.Column="1" Grid.ColumnSpan="2" Margin="4,8" TextWrapping="Wrap" />
+        </Grid>
+      </GroupBox>
+
+      <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12">
+        <Button x:Name="TestButton" Content="{DynamicResource TestTrust}" Click="Test_Click" Padding="18,7" Margin="4" />
+        <Button x:Name="SaveButton" Content="{DynamicResource SaveApply}" Click="Save_Click" Padding="18,7" Margin="4" />
+      </StackPanel>
+
+      <GroupBox Grid.Row="2" Header="{DynamicResource StatusGroup}" Padding="12">
+        <StackPanel>
+          <TextBlock x:Name="ServiceStatusText" Text="{DynamicResource ServiceUnavailable}" TextWrapping="Wrap" MinHeight="72" />
+          <Separator Margin="0,10" />
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="RefreshButton" Content="{DynamicResource Refresh}" Click="Refresh_Click" Padding="14,5" Margin="4" />
+            <Button x:Name="RunButton" Content="{DynamicResource RunNow}" Click="RunNow_Click" Padding="14,5" Margin="4" />
+            <Button Content="{DynamicResource OpenLogs}" Click="OpenLogs_Click" Padding="14,5" Margin="4" />
+          </StackPanel>
+        </StackPanel>
+      </GroupBox>
+    </Grid>
+  </ScrollViewer>
+</Window>

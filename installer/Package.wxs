@@ -1,0 +1,128 @@
+﻿<!--
+  Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+  All rights reserved.
+-->
+
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <Package Name="!(loc.ProductName)"
+           Manufacturer="!(loc.Manufacturer)"
+           Version="$(var.ProductVersion)"
+           UpgradeCode="82A26D36-C81C-4F13-A74E-96364BCF9554"
+           Scope="perMachine"
+           Language="!(loc.Language)"
+           Codepage="65001">
+    <SummaryInformation Description="!(loc.ProductDescription)" Manufacturer="!(loc.Manufacturer)" />
+    <MajorUpgrade DowngradeErrorMessage="!(loc.NewerVersionInstalled)"
+                  Schedule="afterInstallInitialize"
+                  IgnoreLanguage="yes" />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <ui:WixUI Id="WixUI_Minimal" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(sys.SOURCEFILEDIR)License.rtf" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="DB Backup Remote Sync">
+        <Component Id="ServiceComponent" Guid="08F8BC57-E78A-4D7A-A1BA-3E142F4EC02E" Bitness="always64">
+          <File Id="ServiceExecutable"
+                Source="$(var.ServicePublishDir)\DbBackup.RemoteSync.Service.exe"
+                KeyPath="yes" />
+          <ServiceInstall Id="ServiceInstaller"
+                          Name="DbBackupRemoteSync"
+                          DisplayName="!(loc.ServiceDisplayName)"
+                          Description="!(loc.ServiceDescription)"
+                          Type="ownProcess"
+                          Start="auto"
+                          ErrorControl="normal"
+                          Account="NT SERVICE\DbBackupRemoteSync"
+                          Vital="yes">
+            <ServiceConfig DelayedAutoStart="yes"
+                           ServiceSid="unrestricted"
+                           OnInstall="yes"
+                           OnReinstall="yes" />
+            <util:ServiceConfig FirstFailureActionType="restart"
+                                SecondFailureActionType="restart"
+                                ThirdFailureActionType="restart"
+                                RestartServiceDelayInSeconds="60"
+                                ResetPeriodInDays="1" />
+          </ServiceInstall>
+          <ServiceControl Id="ServiceControl"
+                          Name="DbBackupRemoteSync"
+                          Start="install"
+                          Stop="both"
+                          Remove="uninstall"
+                          Wait="yes" />
+        </Component>
+
+        <Component Id="ConfigurationComponent" Guid="C0B9171E-E755-4FD8-BE41-7B34F8C0F610" Bitness="always64">
+          <File Id="ConfigurationExecutable"
+                Source="$(var.ConfigurationPublishDir)\DbBackup.RemoteSync.Configuration.exe"
+                KeyPath="yes">
+            <Shortcut Id="ConfigurationShortcut"
+                      Directory="ApplicationProgramsFolder"
+                      Name="!(loc.ConfigurationShortcut)"
+                      Description="!(loc.ConfigurationShortcutDescription)"
+                      WorkingDirectory="INSTALLFOLDER"
+                      Advertise="yes" />
+          </File>
+          <RemoveFolder Id="RemoveProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
+        </Component>
+
+        <Component Id="EventSourceComponent" Guid="A73133D8-C28C-4DE3-B208-F3299D6C1EF1" Bitness="always64">
+          <RegistryKey Root="HKLM"
+                       Key="SYSTEM\CurrentControlSet\Services\EventLog\Application\DbBackupRemoteSync"
+                       ForceDeleteOnUninstall="yes">
+            <RegistryValue Name="EventMessageFile"
+                           Type="expandable"
+                           Value="%SystemRoot%\Microsoft.NET\Framework64\v4.0.30319\EventLogMessages.dll"
+                           KeyPath="yes" />
+            <RegistryValue Name="TypesSupported" Type="integer" Value="7" />
+          </RegistryKey>
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="DB Backup Remote Sync" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="CommonDataFolder" Name="DB Backup Remote Sync">
+        <Component Id="DataDirectoryComponent" Guid="BFCB36C2-FF66-43A9-9DA6-77A446BBAEC7" Bitness="always64">
+          <CreateFolder>
+            <PermissionEx Id="DataDirectoryPermissions"
+                          Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;S-1-5-80-348240635-1742019744-2267961197-2923289595-107149355)" />
+          </CreateFolder>
+          <RemoveFile Id="RemoveServiceData" Name="*" On="uninstall" />
+          <RemoveFolder Id="RemoveDataFolder" On="uninstall" />
+          <RegistryValue Root="HKLM"
+                         Key="Software\DB Backup Remote Sync"
+                         Name="DataDirectory"
+                         Type="string"
+                         Value="[CommonDataFolder]"
+                         KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <Feature Id="MainFeature" Title="!(loc.ProductName)" Level="1">
+      <ComponentRef Id="ServiceComponent" />
+      <ComponentRef Id="ConfigurationComponent" />
+      <ComponentRef Id="EventSourceComponent" />
+      <ComponentRef Id="DataDirectoryComponent" />
+    </Feature>
+
+    <CustomAction Id="CleanupManagedDestinationAcl"
+                  FileRef="ConfigurationExecutable"
+                  ExeCommand="--uninstall-cleanup"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore" />
+    <InstallExecuteSequence>
+      <Custom Action="CleanupManagedDestinationAcl"
+              After="StopServices"
+              Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>

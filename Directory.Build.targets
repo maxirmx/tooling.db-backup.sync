@@ -1,0 +1,10 @@
+﻿<!--
+  Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+  All rights reserved.
+-->
+
+<Project>
+  <ItemGroup Condition="'$(IsTestProject)' == 'true'">
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>
