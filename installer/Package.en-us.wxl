@@ -12,5 +12,6 @@
   <String Id="ServiceDescription" Value="Downloads missing backup files from a trusted SFTP server on a daily schedule." />
   <String Id="ConfigurationShortcut" Value="Configure DB Backup Remote Sync" />
   <String Id="ConfigurationShortcutDescription" Value="Configure and monitor the remote backup synchronization service." />
+  <String Id="LaunchConfiguration" Value="Start DB Backup Remote Sync configuration" />
   <String Id="NewerVersionInstalled" Value="A newer version of DB Backup Remote Sync is already installed." />
 </WixLocalization>
