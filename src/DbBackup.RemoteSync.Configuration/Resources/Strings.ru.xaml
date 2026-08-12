@@ -8,6 +8,7 @@
                     xmlns:sys="clr-namespace:System;assembly=System.Runtime">
   <sys:String x:Key="WindowTitle">Настройка DB Backup Remote Sync</sys:String>
   <sys:String x:Key="AppTitle">DB Backup Remote Sync</sys:String>
+  <sys:String x:Key="VersionLabel">Версия</sys:String>
   <sys:String x:Key="ConnectionGroup">Подключение и каталог назначения</sys:String>
   <sys:String x:Key="Host">Удалённый сервер</sys:String>
   <sys:String x:Key="Port">Порт SSH</sys:String>

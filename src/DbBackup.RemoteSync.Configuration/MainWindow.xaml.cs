@@ -33,6 +33,7 @@ public partial class MainWindow : Window
         _trustStore = new HostTrustStore(_paths);
         _credentialStore = new DpapiCredentialStore(_paths);
         InitializeComponent();
+        VersionText.Text = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? string.Empty;
         _statusTimer = new DispatcherTimer(TimeSpan.FromSeconds(5), DispatcherPriority.Background, StatusTimer_Tick, Dispatcher);
         Loaded += Window_Loaded;
         Closed += (_, _) => _statusTimer.Stop();

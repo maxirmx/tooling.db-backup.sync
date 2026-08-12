@@ -22,8 +22,14 @@
       <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="4,0,0,14">
         <Image Source="pack://application:,,,/Assets/db-backup-remote-sync.png"
                Width="52" Height="52" Stretch="Uniform" Margin="0,0,12,0" />
-        <TextBlock Text="{DynamicResource AppTitle}"
-                   FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" />
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock Text="{DynamicResource AppTitle}"
+                     FontSize="24" FontWeight="SemiBold" />
+          <StackPanel Orientation="Horizontal" Margin="1,2,0,0">
+            <TextBlock Text="{DynamicResource VersionLabel}" FontSize="11" Foreground="Gray" />
+            <TextBlock x:Name="VersionText" FontSize="11" Foreground="Gray" Margin="4,0,0,0" />
+          </StackPanel>
+        </StackPanel>
       </StackPanel>
 
       <GroupBox Grid.Row="1" Header="{DynamicResource ConnectionGroup}" Padding="12">

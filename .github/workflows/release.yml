@@ -53,7 +53,7 @@ jobs:
           if ($null -eq $msi) { throw 'English MSI was not produced.' }
           ./eng/smoke-installer.ps1 -MsiPath $msi.FullName
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: DB-Backup-Remote-Sync-${{ steps.version.outputs.value }}
           path: |

@@ -12,6 +12,7 @@
   <String Id="ServiceDescription" Value="Ежедневно загружает отсутствующие файлы резервных копий с доверенного сервера SFTP." />
   <String Id="ConfigurationShortcut" Value="Настройка DB Backup Remote Sync" />
   <String Id="ConfigurationShortcutDescription" Value="Настройка и контроль службы синхронизации удалённых резервных копий." />
+  <String Id="LaunchConfiguration" Value="Запустить настройку DB Backup Remote Sync" />
   <String Id="NewerVersionInstalled" Value="Уже установлена более новая версия DB Backup Remote Sync." />
   <String Id="msierrSecureObjectsFailedCreateSD" Value="Не удалось создать дескриптор безопасности для [3]\\[4]. Системная ошибка: [2]" />
   <String Id="msierrSecureObjectsFailedSet" Value="Не удалось применить дескриптор безопасности к объекту [3]. Системная ошибка: [2]" />
