@@ -5,33 +5,29 @@ namespace DbBackup.RemoteSync.Core.Tests;
 
 public sealed class RemoteEntryClassifierTests
 {
-    [Fact]
+    [Test]
     public void ClassifiesSupportedEntryTypes()
     {
-        Assert.Equal(
-            RemoteEntryKind.RegularFile,
-            RemoteEntryClassifier.Classify(new RemoteEntryTypeFlags(IsRegularFile: true)));
-        Assert.Equal(
-            RemoteEntryKind.Directory,
-            RemoteEntryClassifier.Classify(new RemoteEntryTypeFlags(IsDirectory: true)));
-        Assert.Equal(
-            RemoteEntryKind.SymbolicLink,
-            RemoteEntryClassifier.Classify(new RemoteEntryTypeFlags(IsSymbolicLink: true)));
-        Assert.Equal(
-            RemoteEntryKind.Special,
-            RemoteEntryClassifier.Classify(new RemoteEntryTypeFlags(IsNamedPipe: true)));
-        Assert.Equal(
-            RemoteEntryKind.Special,
-            RemoteEntryClassifier.Classify(new RemoteEntryTypeFlags(IsSocket: true)));
-        Assert.Equal(
-            RemoteEntryKind.Special,
-            RemoteEntryClassifier.Classify(new RemoteEntryTypeFlags(IsBlockDevice: true)));
-        Assert.Equal(
-            RemoteEntryKind.Special,
-            RemoteEntryClassifier.Classify(new RemoteEntryTypeFlags(IsCharacterDevice: true)));
+        using (Assert.EnterMultipleScope())
+        {
+            Assert.That(RemoteEntryClassifier.Classify(new RemoteEntryTypeFlags(IsRegularFile: true)),
+                Is.EqualTo(RemoteEntryKind.RegularFile));
+            Assert.That(RemoteEntryClassifier.Classify(new RemoteEntryTypeFlags(IsDirectory: true)),
+                Is.EqualTo(RemoteEntryKind.Directory));
+            Assert.That(RemoteEntryClassifier.Classify(new RemoteEntryTypeFlags(IsSymbolicLink: true)),
+                Is.EqualTo(RemoteEntryKind.SymbolicLink));
+            Assert.That(RemoteEntryClassifier.Classify(new RemoteEntryTypeFlags(IsNamedPipe: true)),
+                Is.EqualTo(RemoteEntryKind.Special));
+            Assert.That(RemoteEntryClassifier.Classify(new RemoteEntryTypeFlags(IsSocket: true)),
+                Is.EqualTo(RemoteEntryKind.Special));
+            Assert.That(RemoteEntryClassifier.Classify(new RemoteEntryTypeFlags(IsBlockDevice: true)),
+                Is.EqualTo(RemoteEntryKind.Special));
+            Assert.That(RemoteEntryClassifier.Classify(new RemoteEntryTypeFlags(IsCharacterDevice: true)),
+                Is.EqualTo(RemoteEntryKind.Special));
+        }
     }
 
-    [Fact]
+    [Test]
     public async Task UnknownListedTypeIsResolvedFromRefreshedMetadata()
     {
         var refreshCalls = 0;
@@ -47,12 +43,12 @@ public sealed class RemoteEntryClassifierTests
             "/backups/database.sql",
             CancellationToken.None);
 
-        Assert.Equal(RemoteEntryKind.RegularFile, resolved.Kind);
-        Assert.True(resolved.Metadata.IsRegularFile);
-        Assert.Equal(1, refreshCalls);
+        Assert.That(resolved.Kind, Is.EqualTo(RemoteEntryKind.RegularFile));
+        Assert.That(resolved.Metadata.IsRegularFile, Is.True);
+        Assert.That(refreshCalls, Is.EqualTo(1));
     }
 
-    [Fact]
+    [Test]
     public async Task KnownListedTypeDoesNotRefreshMetadata()
     {
         var resolved = await RemoteEntryClassifier.ResolveAsync(
@@ -62,20 +58,19 @@ public sealed class RemoteEntryClassifierTests
             "/backups/archive",
             CancellationToken.None);
 
-        Assert.Equal(RemoteEntryKind.Directory, resolved.Kind);
+        Assert.That(resolved.Kind, Is.EqualTo(RemoteEntryKind.Directory));
     }
 
-    [Fact]
+    [Test]
     public async Task UnknownRefreshedTypeFailsWithRemotePath()
     {
-        var exception = await Assert.ThrowsAsync<InvalidDataException>(() =>
-            RemoteEntryClassifier.ResolveAsync(
+        await Assert.ThatAsync(
+            () => RemoteEntryClassifier.ResolveAsync(
                 new RemoteEntryTypeFlags(),
                 flags => flags,
                 _ => Task.FromResult(new RemoteEntryTypeFlags()),
                 "/backups/unknown-entry",
-                CancellationToken.None));
-
-        Assert.Contains("/backups/unknown-entry", exception.Message, StringComparison.Ordinal);
+                CancellationToken.None),
+            Throws.TypeOf<InvalidDataException>().With.Message.Contains("/backups/unknown-entry"));
     }
 }

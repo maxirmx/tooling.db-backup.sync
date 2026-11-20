@@ -12,8 +12,9 @@
   <ItemGroup>
     <ProjectReference Include="../../src/DbBackup.RemoteSync.Core/DbBackup.RemoteSync.Core.csproj" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="xunit" />
-    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="NUnit" />
+    <PackageReference Include="NUnit.Analyzers" PrivateAssets="all" />
+    <PackageReference Include="NUnit3TestAdapter" PrivateAssets="all" />
     <PackageReference Include="coverlet.collector" PrivateAssets="all" />
   </ItemGroup>
 </Project>

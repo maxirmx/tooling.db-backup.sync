@@ -5,7 +5,7 @@ namespace DbBackup.RemoteSync.Core.Tests;
 
 public sealed class SchedulePlannerTests
 {
-    [Fact]
+    [Test]
     public void StartupAfterDailyTimeRunsCatchUp()
     {
         var now = new DateTimeOffset(2026, 8, 11, 10, 0, 0, TimeSpan.Zero);
@@ -16,12 +16,12 @@ public sealed class SchedulePlannerTests
             new TimeOnly(2, 0),
             TimeZoneInfo.Utc);
 
-        Assert.Equal(ScheduledAction.RunNow, decision.Action);
-        Assert.Equal(new DateOnly(2026, 8, 11), decision.State.ScheduledDate);
-        Assert.Equal(ScheduledSlotStatus.Pending, decision.State.ScheduledStatus);
+        Assert.That(decision.Action, Is.EqualTo(ScheduledAction.RunNow));
+        Assert.That(decision.State.ScheduledDate, Is.EqualTo(new DateOnly(2026, 8, 11)));
+        Assert.That(decision.State.ScheduledStatus, Is.EqualTo(ScheduledSlotStatus.Pending));
     }
 
-    [Fact]
+    [Test]
     public void StartupAfterDailyTimeSkipsCatchUpWhenRequested()
     {
         var now = new DateTimeOffset(2026, 8, 11, 10, 0, 0, TimeSpan.Zero);
@@ -33,13 +33,13 @@ public sealed class SchedulePlannerTests
             TimeZoneInfo.Utc,
             skipDueAtStartup: true);
 
-        Assert.Equal(ScheduledAction.None, decision.Action);
-        Assert.Equal(new DateOnly(2026, 8, 11), decision.State.ScheduledDate);
-        Assert.Equal(ScheduledSlotStatus.Skipped, decision.State.ScheduledStatus);
-        Assert.Equal(new DateTimeOffset(2026, 8, 12, 2, 0, 0, TimeSpan.Zero), decision.NextWakeUtc);
+        Assert.That(decision.Action, Is.EqualTo(ScheduledAction.None));
+        Assert.That(decision.State.ScheduledDate, Is.EqualTo(new DateOnly(2026, 8, 11)));
+        Assert.That(decision.State.ScheduledStatus, Is.EqualTo(ScheduledSlotStatus.Skipped));
+        Assert.That(decision.NextWakeUtc, Is.EqualTo(new DateTimeOffset(2026, 8, 12, 2, 0, 0, TimeSpan.Zero)));
     }
 
-    [Fact]
+    [Test]
     public void StartupBeforeDailyTimeStillRunsWhenScheduleBecomesDue()
     {
         var state = new SchedulerState();
@@ -56,10 +56,10 @@ public sealed class SchedulePlannerTests
             new TimeOnly(2, 0),
             TimeZoneInfo.Utc);
 
-        Assert.Equal(ScheduledAction.RunNow, due.Action);
+        Assert.That(due.Action, Is.EqualTo(ScheduledAction.RunNow));
     }
 
-    [Fact]
+    [Test]
     public void StartupBeforeDailyTimeWaits()
     {
         var now = new DateTimeOffset(2026, 8, 11, 1, 0, 0, TimeSpan.Zero);
@@ -70,11 +70,11 @@ public sealed class SchedulePlannerTests
             new TimeOnly(2, 0),
             TimeZoneInfo.Utc);
 
-        Assert.Equal(ScheduledAction.None, decision.Action);
-        Assert.Equal(new DateTimeOffset(2026, 8, 11, 2, 0, 0, TimeSpan.Zero), decision.NextWakeUtc);
+        Assert.That(decision.Action, Is.EqualTo(ScheduledAction.None));
+        Assert.That(decision.NextWakeUtc, Is.EqualTo(new DateTimeOffset(2026, 8, 11, 2, 0, 0, TimeSpan.Zero)));
     }
 
-    [Fact]
+    [Test]
     public void InitialFailureAndThreeRetriesEndExhausted()
     {
         var now = new DateTimeOffset(2026, 8, 11, 2, 0, 0, TimeSpan.Zero);
@@ -86,39 +86,39 @@ public sealed class SchedulePlannerTests
         };
 
         state = SchedulePlanner.RecordScheduledFailure(state, now);
-        Assert.Equal(now.AddMinutes(5), state.NextAttemptUtc);
+        Assert.That(state.NextAttemptUtc, Is.EqualTo(now.AddMinutes(5)));
         state = SchedulePlanner.RecordScheduledFailure(state, now.AddMinutes(5));
-        Assert.Equal(now.AddMinutes(20), state.NextAttemptUtc);
+        Assert.That(state.NextAttemptUtc, Is.EqualTo(now.AddMinutes(20)));
         state = SchedulePlanner.RecordScheduledFailure(state, now.AddMinutes(20));
-        Assert.Equal(now.AddMinutes(50), state.NextAttemptUtc);
+        Assert.That(state.NextAttemptUtc, Is.EqualTo(now.AddMinutes(50)));
         state = SchedulePlanner.RecordScheduledFailure(state, now.AddMinutes(50));
 
-        Assert.Equal(ScheduledSlotStatus.Exhausted, state.ScheduledStatus);
-        Assert.Null(state.NextAttemptUtc);
-        Assert.Equal(4, state.AttemptsCompleted);
+        Assert.That(state.ScheduledStatus, Is.EqualTo(ScheduledSlotStatus.Exhausted));
+        Assert.That(state.NextAttemptUtc, Is.Null);
+        Assert.That(state.AttemptsCompleted, Is.EqualTo(4));
     }
 
-    [Fact]
+    [Test]
     public void SpringForwardGapRunsAtFirstValidMinute()
     {
         var zone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
 
         var utc = SchedulePlanner.ResolveScheduledUtc(new DateOnly(2026, 3, 8), new TimeOnly(2, 30), zone);
 
-        Assert.Equal(new DateTimeOffset(2026, 3, 8, 7, 0, 0, TimeSpan.Zero), utc);
+        Assert.That(utc, Is.EqualTo(new DateTimeOffset(2026, 3, 8, 7, 0, 0, TimeSpan.Zero)));
     }
 
-    [Fact]
+    [Test]
     public void RepeatedTimeUsesFirstOccurrence()
     {
         var zone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
 
         var utc = SchedulePlanner.ResolveScheduledUtc(new DateOnly(2026, 11, 1), new TimeOnly(1, 30), zone);
 
-        Assert.Equal(new DateTimeOffset(2026, 11, 1, 5, 30, 0, TimeSpan.Zero), utc);
+        Assert.That(utc, Is.EqualTo(new DateTimeOffset(2026, 11, 1, 5, 30, 0, TimeSpan.Zero)));
     }
 
-    [Fact]
+    [Test]
     public void ManualSuccessBeforeDailyTimeDoesNotSatisfySlot()
     {
         var state = new SchedulerState();
@@ -130,10 +130,10 @@ public sealed class SchedulePlannerTests
             TimeZoneInfo.Utc,
             isScheduled: false);
 
-        Assert.Equal(state, updated);
+        Assert.That(updated, Is.EqualTo(state));
     }
 
-    [Fact]
+    [Test]
     public void ManualSuccessAfterDailyTimeSatisfiesStartDateSlot()
     {
         var updated = SchedulePlanner.RecordSuccessfulRun(
@@ -143,11 +143,11 @@ public sealed class SchedulePlannerTests
             TimeZoneInfo.Utc,
             isScheduled: false);
 
-        Assert.Equal(new DateOnly(2026, 8, 11), updated.ScheduledDate);
-        Assert.Equal(ScheduledSlotStatus.Succeeded, updated.ScheduledStatus);
+        Assert.That(updated.ScheduledDate, Is.EqualTo(new DateOnly(2026, 8, 11)));
+        Assert.That(updated.ScheduledStatus, Is.EqualTo(ScheduledSlotStatus.Succeeded));
     }
 
-    [Fact]
+    [Test]
     public void ScheduledRetryAfterMidnightSatisfiesOriginalSlot()
     {
         var state = new SchedulerState
@@ -164,12 +164,12 @@ public sealed class SchedulePlannerTests
             TimeZoneInfo.Utc,
             isScheduled: true);
 
-        Assert.Equal(new DateOnly(2026, 8, 11), updated.ScheduledDate);
-        Assert.Equal(ScheduledSlotStatus.Succeeded, updated.ScheduledStatus);
-        Assert.Equal(0, updated.AttemptsCompleted);
+        Assert.That(updated.ScheduledDate, Is.EqualTo(new DateOnly(2026, 8, 11)));
+        Assert.That(updated.ScheduledStatus, Is.EqualTo(ScheduledSlotStatus.Succeeded));
+        Assert.That(updated.AttemptsCompleted, Is.EqualTo(0));
     }
 
-    [Fact]
+    [Test]
     public void CanceledRunAfterDailyTimeSkipsSlot()
     {
         var updated = SchedulePlanner.RecordCanceledRun(
@@ -179,8 +179,8 @@ public sealed class SchedulePlannerTests
             TimeZoneInfo.Utc,
             isScheduled: false);
 
-        Assert.Equal(new DateOnly(2026, 8, 11), updated.ScheduledDate);
-        Assert.Equal(ScheduledSlotStatus.Skipped, updated.ScheduledStatus);
-        Assert.Null(updated.NextAttemptUtc);
+        Assert.That(updated.ScheduledDate, Is.EqualTo(new DateOnly(2026, 8, 11)));
+        Assert.That(updated.ScheduledStatus, Is.EqualTo(ScheduledSlotStatus.Skipped));
+        Assert.That(updated.NextAttemptUtc, Is.Null);
     }
 }

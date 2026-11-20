@@ -5,6 +5,6 @@
 
 <Project>
   <ItemGroup Condition="'$(IsTestProject)' == 'true'">
-    <Using Include="Xunit" />
+    <Using Include="NUnit.Framework" />
   </ItemGroup>
 </Project>
