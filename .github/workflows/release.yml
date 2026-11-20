@@ -9,9 +9,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: MSI version in MAJOR.MINOR.PATCH form
-        required: true
-        default: 0.2.0
+        description: MSI version override in MAJOR.MINOR.PATCH form (defaults to VERSION)
+        required: false
 
 permissions:
   contents: write
@@ -31,11 +30,15 @@ jobs:
       - name: Resolve version
         id: version
         shell: pwsh
+        env:
+          VERSION_OVERRIDE: ${{ inputs.version }}
         run: |
-          $version = if ('${{ github.event_name }}' -eq 'push') {
-            '${{ github.ref_name }}'.TrimStart('v')
+          $version = if ($env:GITHUB_EVENT_NAME -eq 'push') {
+            $env:GITHUB_REF_NAME.TrimStart('v')
+          } elseif ($env:VERSION_OVERRIDE) {
+            $env:VERSION_OVERRIDE
           } else {
-            '${{ inputs.version }}'
+            (Get-Content -LiteralPath VERSION -Raw).Trim()
           }
           if ($version -notmatch '^\d+\.\d+\.\d+$') {
             throw "Release version must be MAJOR.MINOR.PATCH: $version"

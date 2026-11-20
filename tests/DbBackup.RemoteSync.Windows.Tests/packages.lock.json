@@ -425,7 +425,7 @@
       "dbbackup.remotesync.service": {
         "type": "Project",
         "dependencies": {
-          "DbBackup.RemoteSync.Core": "[1.0.0, )",
+          "DbBackup.RemoteSync.Core": "[0.2.0, )",
           "Microsoft.Extensions.Hosting.WindowsServices": "[11.0.0, )",
           "Microsoft.Extensions.Logging.EventLog": "[11.0.0, )"
         }

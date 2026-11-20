@@ -5,8 +5,7 @@
 
 [CmdletBinding()]
 param(
-    [ValidatePattern('^\d+\.\d+\.\d+$')]
-    [string] $Version = '0.2.0',
+    [string] $Version,
 
     [ValidateSet('Debug', 'Release')]
     [string] $Configuration = 'Release',
@@ -18,6 +17,13 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $projectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+if (-not $PSBoundParameters.ContainsKey('Version')) {
+    $Version = (Get-Content -LiteralPath (Join-Path $projectRoot 'VERSION') -Raw).Trim()
+}
+if ($Version -notmatch '^\d+\.\d+\.\d+$') {
+    throw "Build version must be MAJOR.MINOR.PATCH: $Version"
+}
+
 $artifactsDirectory = [System.IO.Path]::GetFullPath((Join-Path $projectRoot 'artifacts'))
 $rootPrefix = $projectRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
 if (-not $artifactsDirectory.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
