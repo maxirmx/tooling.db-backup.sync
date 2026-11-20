@@ -26,7 +26,7 @@ jobs:
 
       - name: Build, test, and package
         shell: pwsh
-        run: ./eng/build.ps1 -Version 0.2.0
+        run: ./eng/build.ps1
 
       - name: Smoke-test MSI
         shell: pwsh

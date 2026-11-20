@@ -79,17 +79,18 @@ If the service reports a changed host key, verify the change with the server adm
 Prerequisites are the .NET 10 SDK, PowerShell 7, and network access to restore the pinned NuGet and WiX 4.0.5 packages.
 
 ```powershell
-./eng/build.ps1 -Version 0.2.0
+./eng/build.ps1
 ```
 
 The build restores in locked mode, compiles the service and utility, runs all tests, publishes self-contained single-file executables, builds both localized MSIs, and writes adjacent SHA-256 checksum files under `artifacts/package`.
 
-The SFTP download test in the Core test project is opt-in. Define `SFTP_TEST_HOST`, `SFTP_TEST_USERNAME`, `SFTP_TEST_PASSWORD`, `SFTP_TEST_FINGERPRINT`, `SFTP_TEST_EXPECTED_FILE`, and `SFTP_TEST_EXPECTED_SHA256`. You can also define `SFTP_TEST_PORT` and `SFTP_TEST_FOLDER`. The expected file is relative to the configured folder and its SHA-256 value is hexadecimal.
+The default version comes from [VERSION](VERSION). After changing it, run `dotnet restore --force-evaluate` to refresh the NuGet lock files. Pass `-Version` to override it for one build.
 
 The installer smoke test performs real machine installation and removal and therefore requires an elevated disposable Windows environment:
 
 ```powershell
-./eng/smoke-installer.ps1 -MsiPath ./artifacts/package/en-us/DB-Backup-Remote-Sync-0.2.0-en-US.msi
+$msi = Get-ChildItem ./artifacts/package/en-us -Filter '*.msi'
+./eng/smoke-installer.ps1 -MsiPath $msi.FullName
 ```
 
 Tags in `vMAJOR.MINOR.PATCH` form build and publish the unsigned localized MSIs and checksums as GitHub Release assets.
@@ -170,17 +171,18 @@ Test-NetConnection backup.example.com -Port 22
 Требуются SDK .NET 10, PowerShell 7 и доступ к сети для восстановления зафиксированных пакетов NuGet и WiX 4.0.5.
 
 ```powershell
-./eng/build.ps1 -Version 0.2.0
+./eng/build.ps1
 ```
 
 Скрипт выполняет восстановление в заблокированном режиме, сборку, все тесты, публикацию самодостаточных одиночных EXE, создание двух локализованных MSI и файлов контрольных сумм SHA-256 в `artifacts/package`.
 
-Тест скачивания по SFTP в проекте тестов Core запускается, если заданы переменные `SFTP_TEST_HOST`, `SFTP_TEST_USERNAME`, `SFTP_TEST_PASSWORD`, `SFTP_TEST_FINGERPRINT`, `SFTP_TEST_EXPECTED_FILE` и `SFTP_TEST_EXPECTED_SHA256`. Дополнительно можно задать `SFTP_TEST_PORT` и `SFTP_TEST_FOLDER`. Имя ожидаемого файла задаётся относительно удалённого каталога. Значение SHA-256 задаётся в шестнадцатеричном виде.
+Версия по умолчанию хранится в файле [VERSION](VERSION). После её изменения выполните `dotnet restore --force-evaluate`, чтобы обновить файлы блокировки NuGet. Для отдельной сборки версию можно переопределить параметром `-Version`.
 
 Тест MSI действительно устанавливает и удаляет продукт, поэтому его следует запускать с повышенными правами только в одноразовой среде Windows:
 
 ```powershell
-./eng/smoke-installer.ps1 -MsiPath ./artifacts/package/ru-ru/DB-Backup-Remote-Sync-0.2.0-ru-RU.msi
+$msi = Get-ChildItem ./artifacts/package/ru-ru -Filter '*.msi'
+./eng/smoke-installer.ps1 -MsiPath $msi.FullName
 ```
 
 Теги вида `vMAJOR.MINOR.PATCH` создают GitHub Release с неподписанными локализованными MSI и контрольными суммами.
