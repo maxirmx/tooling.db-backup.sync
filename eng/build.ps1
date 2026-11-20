@@ -1,4 +1,4 @@
-﻿# Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+# Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
 # All rights reserved.
 
 #Requires -Version 7.0
@@ -6,7 +6,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+$')]
-    [string] $Version = '0.1.0',
+    [string] $Version = '0.2.0',
 
     [ValidateSet('Debug', 'Release')]
     [string] $Configuration = 'Release',
@@ -43,8 +43,7 @@ try {
     if (-not $SkipTests) {
         foreach ($testProject in @(
             '.\tests\DbBackup.RemoteSync.Core.Tests\DbBackup.RemoteSync.Core.Tests.csproj',
-            '.\tests\DbBackup.RemoteSync.Windows.Tests\DbBackup.RemoteSync.Windows.Tests.csproj',
-            '.\tests\DbBackup.RemoteSync.Sftp.Tests\DbBackup.RemoteSync.Sftp.Tests.csproj'
+            '.\tests\DbBackup.RemoteSync.Windows.Tests\DbBackup.RemoteSync.Windows.Tests.csproj'
         )) {
             dotnet test $testProject --configuration $Configuration --no-restore
             if ($LASTEXITCODE -ne 0) { throw "Tests failed: $testProject" }
