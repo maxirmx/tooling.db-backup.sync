@@ -1,12 +1,29 @@
 // Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
 // All rights reserved.
 
+using System.Security.Authentication;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DbBackup.RemoteSync.Core.Tests;
 
 public sealed class SynchronizationEngineTests
 {
+    [Test]
+    public async Task RejectsMismatchedHostKeyBeforeDownload()
+    {
+        using var temporary = new TemporaryDirectory();
+        var remote = new FakeRemoteClient(new Dictionary<string, byte[]> { ["backup.sql"] = [1] });
+        var engine = CreateEngine(remote);
+        var settings = TestSettings.Create(temporary.Path);
+        var trust = CreateTrust() with { Sha256Fingerprint = "SHA256:mismatched" };
+
+        await Assert.ThatAsync(
+            () => engine.SynchronizeAsync(settings, "secret", trust, CancellationToken.None),
+            Throws.TypeOf<AuthenticationException>());
+
+        Assert.That(remote.Downloaded, Is.Empty);
+    }
+
     [Test]
     public async Task DownloadsOnlyMissingFilesAndPreservesTimestamp()
     {
@@ -185,7 +202,11 @@ public sealed class SynchronizationEngineTests
                 settings.Connection.Port,
                 "ssh-ed25519",
                 "SHA256:test");
-            Assert.That(hostKeyValidator(hostKey), Is.True);
+            if (!hostKeyValidator(hostKey))
+            {
+                throw new AuthenticationException("The fake SFTP server's host key was rejected.");
+            }
+
             return client;
         }
     }

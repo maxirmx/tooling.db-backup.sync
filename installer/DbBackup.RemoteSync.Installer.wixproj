@@ -8,7 +8,6 @@
     <OutputType>Package</OutputType>
     <Platform>x64</Platform>
     <InstallerPlatform>x64</InstallerPlatform>
-    <Version Condition="'$(Version)' == ''">0.1.0</Version>
     <Cultures Condition="'$(Cultures)' == ''">en-us</Cultures>
     <OutputName Condition="'$(OutputName)' == ''">DB-Backup-Remote-Sync-$(Version)-$(Cultures)</OutputName>
     <ServicePublishDir Condition="'$(ServicePublishDir)' == ''">$(MSBuildThisFileDirectory)..\artifacts\publish\service</ServicePublishDir>
