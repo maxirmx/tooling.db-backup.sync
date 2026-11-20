@@ -5,25 +5,24 @@ namespace DbBackup.RemoteSync.Core.Tests;
 
 public sealed class WindowsPathMapperTests
 {
-    [Fact]
+    [Test]
     public void NestedRemotePathUsesWindowsSeparators()
     {
-        Assert.Equal(Path.Combine("year", "month", "backup.sql"),
-            WindowsPathMapper.ToLocalRelativePath("year/month/backup.sql"));
+        Assert.That(WindowsPathMapper.ToLocalRelativePath("year/month/backup.sql"),
+            Is.EqualTo(Path.Combine("year", "month", "backup.sql")));
     }
 
-    [Theory]
-    [InlineData("../secret")]
-    [InlineData("folder//file")]
-    [InlineData("folder/CON.txt")]
-    [InlineData("folder/trailing.")]
-    [InlineData("folder/bad:name")]
+    [TestCase("../secret")]
+    [TestCase("folder//file")]
+    [TestCase("folder/CON.txt")]
+    [TestCase("folder/trailing.")]
+    [TestCase("folder/bad:name")]
     public void UnsafeRemotePathIsRejected(string path)
     {
         Assert.Throws<InvalidDataException>(() => WindowsPathMapper.ToLocalRelativePath(path));
     }
 
-    [Fact]
+    [Test]
     public void CombinedPathCannotEscapeRoot()
     {
         Assert.Throws<InvalidDataException>(() =>

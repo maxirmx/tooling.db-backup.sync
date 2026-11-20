@@ -1,4 +1,4 @@
-﻿// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
+// Copyright (C) 2026 Maxim [maxirmx] Samsonov (www.sw.consulting)
 // All rights reserved.
 
 using System.Security.AccessControl;
@@ -6,13 +6,14 @@ using System.Security.Principal;
 
 namespace DbBackup.RemoteSync.Windows.Tests;
 
+[FixtureLifeCycle(LifeCycle.InstancePerTestCase)]
 public sealed class WindowsSecurityTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "remote-sync-windows-tests", Guid.NewGuid().ToString("N"));
 
     public WindowsSecurityTests() => Directory.CreateDirectory(_root);
 
-    [Fact]
+    [Test]
     public async Task DpapiCredentialRoundTripsAndFileIsAclProtected()
     {
         using var currentIdentity = WindowsIdentity.GetCurrent();
@@ -23,23 +24,22 @@ public sealed class WindowsSecurityTests : IDisposable
 
         await store.SaveAsync("correct horse battery staple");
 
-        Assert.Equal("correct horse battery staple", await store.LoadAsync());
+        Assert.That(await store.LoadAsync(), Is.EqualTo("correct horse battery staple"));
         var protectedBytes = await File.ReadAllBytesAsync(paths.CredentialFile);
-        Assert.True(protectedBytes.AsSpan().IndexOf("correct horse battery staple"u8) < 0);
+        Assert.That(protectedBytes.AsSpan().IndexOf("correct horse battery staple"u8), Is.LessThan(0));
         var security = new FileInfo(paths.CredentialFile).GetAccessControl();
-        var rules = security.GetAccessRules(
+        var identities = security.GetAccessRules(
                 includeExplicit: true,
                 includeInherited: true,
                 targetType: typeof(SecurityIdentifier))
             .Cast<FileSystemAccessRule>()
+            .Select(rule => rule.IdentityReference)
             .ToArray();
-        Assert.Contains(rules, rule => rule.IdentityReference.Equals(currentSid));
-        Assert.DoesNotContain(rules, rule =>
-            rule.IdentityReference is SecurityIdentifier sid &&
-            sid.IsWellKnown(WellKnownSidType.WorldSid));
+        Assert.That(identities, Has.Member(currentSid));
+        Assert.That(identities, Has.No.Member(new SecurityIdentifier(WellKnownSidType.WorldSid, null)));
     }
 
-    [Fact]
+    [Test]
     public void DestinationRuleCanBeGrantedAndRemovedPrecisely()
     {
         using var currentIdentity = WindowsIdentity.GetCurrent();
@@ -49,13 +49,13 @@ public sealed class WindowsSecurityTests : IDisposable
         var manager = new ServiceDirectoryAccessManager(currentSid);
 
         manager.GrantModify(destination);
-        Assert.True(ContainsExplicitManagedRule(destination, currentSid));
+        Assert.That(ContainsExplicitManagedRule(destination, currentSid), Is.True);
 
         manager.RemoveManagedRule(destination);
-        Assert.False(ContainsExplicitManagedRule(destination, currentSid));
+        Assert.That(ContainsExplicitManagedRule(destination, currentSid), Is.False);
     }
 
-    [Fact]
+    [Test]
     public async Task StoresWriteVersionedJsonAtomically()
     {
         var paths = new ApplicationDataPaths(_root);
@@ -74,8 +74,8 @@ public sealed class WindowsSecurityTests : IDisposable
         await store.SaveAsync(settings);
         var loaded = await store.LoadAsync();
 
-        Assert.Equal(settings, loaded);
-        Assert.Empty(Directory.EnumerateFiles(_root, "*.tmp"));
+        Assert.That(loaded, Is.EqualTo(settings));
+        Assert.That(Directory.EnumerateFiles(_root, "*.tmp"), Is.Empty);
     }
 
     public void Dispose()

@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DbBackup.RemoteSync.Windows.Tests;
 
+[FixtureLifeCycle(LifeCycle.InstancePerTestCase)]
 public sealed class RemoteSyncWorkerTests : IDisposable
 {
     private readonly string _root = Path.Combine(
@@ -16,7 +17,7 @@ public sealed class RemoteSyncWorkerTests : IDisposable
 
     public RemoteSyncWorkerTests() => Directory.CreateDirectory(_root);
 
-    [Fact]
+    [Test]
     public async Task StartupAfterDailyTimeDoesNotBeginSynchronization()
     {
         var paths = new ApplicationDataPaths(_root);
@@ -42,12 +43,12 @@ public sealed class RemoteSyncWorkerTests : IDisposable
             await WaitUntilAsync(() => worker.GetStatus().Status?.NextAttemptUtc is not null);
 
             var status = worker.GetStatus().Status;
-            Assert.NotNull(status);
-            Assert.False(status.IsRunning);
-            Assert.Null(status.LastRun);
-            Assert.Equal(0, remote.DownloadCalls);
+            Assert.That(status, Is.Not.Null);
+            Assert.That(status.IsRunning, Is.False);
+            Assert.That(status.LastRun, Is.Null);
+            Assert.That(remote.DownloadCalls, Is.EqualTo(0));
             var state = await stateStore.LoadAsync();
-            Assert.Equal(ScheduledSlotStatus.Skipped, state.ScheduledStatus);
+            Assert.That(state.ScheduledStatus, Is.EqualTo(ScheduledSlotStatus.Skipped));
         }
         finally
         {
@@ -56,7 +57,7 @@ public sealed class RemoteSyncWorkerTests : IDisposable
         }
     }
 
-    [Fact]
+    [Test]
     public async Task ExplicitReloadAndRunAcceptsFirstConfigurationAndDoesNotDuplicateDueSlot()
     {
         var paths = new ApplicationDataPaths(_root);
@@ -82,8 +83,8 @@ public sealed class RemoteSyncWorkerTests : IDisposable
 
             var response = worker.RequestReloadAndRunNow();
 
-            Assert.True(response.Accepted);
-            Assert.Equal("ReloadAndRunQueued", response.Code);
+            Assert.That(response.Accepted, Is.True);
+            Assert.That(response.Code, Is.EqualTo("ReloadAndRunQueued"));
             await WaitUntilAsync(() =>
             {
                 var status = worker.GetStatus().Status;
@@ -91,11 +92,11 @@ public sealed class RemoteSyncWorkerTests : IDisposable
             });
 
             var finalStatus = worker.GetStatus().Status;
-            Assert.NotNull(finalStatus);
-            Assert.Equal("manual", finalStatus.LastRun?.Reason);
-            Assert.Equal(1, finalStatus.LastRun?.RemoteFiles);
-            Assert.Equal(1, finalStatus.LastRun?.Downloaded);
-            Assert.Equal(1, remote.DownloadCalls);
+            Assert.That(finalStatus, Is.Not.Null);
+            Assert.That(finalStatus.LastRun?.Reason, Is.EqualTo("manual"));
+            Assert.That(finalStatus.LastRun?.RemoteFiles, Is.EqualTo(1));
+            Assert.That(finalStatus.LastRun?.Downloaded, Is.EqualTo(1));
+            Assert.That(remote.DownloadCalls, Is.EqualTo(1));
         }
         finally
         {
@@ -104,7 +105,7 @@ public sealed class RemoteSyncWorkerTests : IDisposable
         }
     }
 
-    [Fact]
+    [Test]
     public async Task ReloadAndRunIsRejectedWhileSynchronizationIsActive()
     {
         var paths = new ApplicationDataPaths(_root);
@@ -130,27 +131,27 @@ public sealed class RemoteSyncWorkerTests : IDisposable
         {
             await WaitUntilAsync(() => worker.GetStatus().Status?.ConfigurationValid == true);
             var runResponse = worker.RequestRunNow();
-            Assert.True(runResponse.Accepted);
+            Assert.That(runResponse.Accepted, Is.True);
             await WaitUntilAsync(() => worker.GetStatus().Status?.IsRunning == true);
 
             var response = worker.RequestReloadAndRunNow();
 
-            Assert.False(response.Accepted);
-            Assert.Equal("AlreadyRunning", response.Code);
+            Assert.That(response.Accepted, Is.False);
+            Assert.That(response.Code, Is.EqualTo("AlreadyRunning"));
             await WaitUntilAsync(() => worker.GetStatus().Status?.ActiveFile == "database.sql");
             var activeStatus = worker.GetStatus().Status;
-            Assert.NotNull(activeStatus);
-            Assert.Equal(0, activeStatus.ActiveBytesDownloaded);
-            Assert.Equal(4, activeStatus.ActiveTotalBytes);
-            Assert.Equal(1, activeStatus.ActiveFileNumber);
-            Assert.Equal(1, activeStatus.ActiveFileCount);
-            Assert.Equal(0, activeStatus.ActiveCompletedFiles);
-            Assert.Equal(0, activeStatus.ActiveOverallBytesDownloaded);
-            Assert.Equal(4, activeStatus.ActiveOverallTotalBytes);
+            Assert.That(activeStatus, Is.Not.Null);
+            Assert.That(activeStatus.ActiveBytesDownloaded, Is.EqualTo(0));
+            Assert.That(activeStatus.ActiveTotalBytes, Is.EqualTo(4));
+            Assert.That(activeStatus.ActiveFileNumber, Is.EqualTo(1));
+            Assert.That(activeStatus.ActiveFileCount, Is.EqualTo(1));
+            Assert.That(activeStatus.ActiveCompletedFiles, Is.EqualTo(0));
+            Assert.That(activeStatus.ActiveOverallBytesDownloaded, Is.EqualTo(0));
+            Assert.That(activeStatus.ActiveOverallTotalBytes, Is.EqualTo(4));
             releaseDownload.SetResult();
             await WaitUntilAsync(() => worker.GetStatus().Status?.LastRun?.Succeeded == true);
-            Assert.Null(worker.GetStatus().Status?.ActiveFile);
-            Assert.Equal(1, remote.DownloadCalls);
+            Assert.That(worker.GetStatus().Status?.ActiveFile, Is.Null);
+            Assert.That(remote.DownloadCalls, Is.EqualTo(1));
         }
         finally
         {
@@ -160,7 +161,7 @@ public sealed class RemoteSyncWorkerTests : IDisposable
         }
     }
 
-    [Fact]
+    [Test]
     public async Task CancelStopsActiveSynchronizationAndRemovesPartialFile()
     {
         var paths = new ApplicationDataPaths(_root);
@@ -185,20 +186,20 @@ public sealed class RemoteSyncWorkerTests : IDisposable
         try
         {
             await WaitUntilAsync(() => worker.GetStatus().Status?.ConfigurationValid == true);
-            Assert.True(worker.RequestRunNow().Accepted);
+            Assert.That(worker.RequestRunNow().Accepted, Is.True);
             await WaitUntilAsync(() => worker.GetStatus().Status?.ActiveFile == "database.sql");
 
             var response = worker.RequestCancel();
 
-            Assert.True(response.Accepted);
-            Assert.Equal("CancellationRequested", response.Code);
+            Assert.That(response.Accepted, Is.True);
+            Assert.That(response.Code, Is.EqualTo("CancellationRequested"));
             await WaitUntilAsync(() => worker.GetStatus().Status?.IsRunning == false);
-            Assert.Equal(1, remote.DownloadCalls);
-            Assert.False(worker.RequestCancel().Accepted);
+            Assert.That(remote.DownloadCalls, Is.EqualTo(1));
+            Assert.That(worker.RequestCancel().Accepted, Is.False);
             var destination = CreateSettings().Destination.LocalFolder;
-            Assert.Empty(Directory.EnumerateFiles(destination, ".db-backup-download-*.partial"));
+            Assert.That(Directory.EnumerateFiles(destination, ".db-backup-download-*.partial"), Is.Empty);
             var state = await stateStore.LoadAsync();
-            Assert.Equal(ScheduledSlotStatus.Skipped, state.ScheduledStatus);
+            Assert.That(state.ScheduledStatus, Is.EqualTo(ScheduledSlotStatus.Skipped));
         }
         finally
         {
@@ -302,12 +303,13 @@ public sealed class RemoteSyncWorkerTests : IDisposable
             string password,
             Func<PresentedHostKey, bool> hostKeyValidator)
         {
-            Assert.Equal("secret", password);
-            Assert.True(hostKeyValidator(new PresentedHostKey(
+            Assert.That(password, Is.EqualTo("secret"));
+            var hostKey = new PresentedHostKey(
                 settings.Connection.Host,
                 settings.Connection.Port,
                 "ssh-ed25519",
-                "SHA256:test")));
+                "SHA256:test");
+            Assert.That(hostKeyValidator(hostKey), Is.True);
             return client;
         }
     }

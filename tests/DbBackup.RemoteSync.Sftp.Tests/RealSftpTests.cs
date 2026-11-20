@@ -2,47 +2,22 @@
 // All rights reserved.
 
 using System.Security.Cryptography;
+using Renci.SshNet.Common;
 
 namespace DbBackup.RemoteSync.Sftp.Tests;
 
+[Category("Integration")]
 public sealed class RealSftpTests
 {
-    [SftpFact(
-        "SFTP_TEST_HOST",
-        "SFTP_TEST_USERNAME",
-        "SFTP_TEST_PASSWORD",
-        "SFTP_TEST_FINGERPRINT",
-        "SFTP_TEST_EXPECTED_FILE",
-        "SFTP_TEST_EXPECTED_SHA256")]
-    [Trait("Category", "Integration")]
+    [Test]
     public async Task AuthenticatesTrustsAndListsConfiguredServer()
     {
-        var host = GetRequiredEnvironmentVariable("SFTP_TEST_HOST");
-        var username = GetRequiredEnvironmentVariable("SFTP_TEST_USERNAME");
+        var settings = CreateSettings();
         var password = GetRequiredEnvironmentVariable("SFTP_TEST_PASSWORD");
         var fingerprint = GetRequiredEnvironmentVariable("SFTP_TEST_FINGERPRINT");
         var expectedFile = GetRequiredEnvironmentVariable("SFTP_TEST_EXPECTED_FILE").Replace('\\', '/');
         var expectedSha256 = GetRequiredEnvironmentVariable("SFTP_TEST_EXPECTED_SHA256");
 
-        var port = int.TryParse(Environment.GetEnvironmentVariable("SFTP_TEST_PORT"), out var parsedPort)
-            ? parsedPort
-            : 22;
-        var remoteFolder = Environment.GetEnvironmentVariable("SFTP_TEST_FOLDER") ?? "/";
-        var settings = new RemoteSyncSettings
-        {
-            Connection = new ConnectionSettings
-            {
-                Host = host,
-                Port = port,
-                Username = username,
-                RemoteFolder = remoteFolder,
-            },
-            Destination = new DestinationSettings
-            {
-                LocalFolder = Path.Combine(Path.GetTempPath(), "remote-sync-sftp-tests", Guid.NewGuid().ToString("N")),
-                Recursive = false,
-            },
-        };
         PresentedHostKey? presented = null;
         await using var client = new SftpRemoteFileClient(
             settings,
@@ -54,63 +29,65 @@ public sealed class RealSftpTests
             });
 
         var inventory = await client.ListFilesAsync(CancellationToken.None);
-        var file = Assert.Single(inventory.Files, candidate => candidate.RelativePath == expectedFile);
+        var matches = inventory.Files.Where(candidate => candidate.RelativePath == expectedFile).ToArray();
+        Assert.That(matches, Has.Length.EqualTo(1), $"Expected exactly one remote file named '{expectedFile}'.");
+        var file = matches[0];
         await client.TestFileReadAsync(file, CancellationToken.None);
         await using var content = new MemoryStream();
         await client.DownloadFileAsync(file, content, CancellationToken.None);
         var actualSha256 = Convert.ToHexStringLower(SHA256.HashData(content.ToArray()));
 
-        Assert.NotNull(presented);
-        Assert.Equal(fingerprint, presented.Sha256Fingerprint);
-        Assert.Equal(expectedSha256, actualSha256, ignoreCase: true);
-        Assert.All(inventory.Files, candidate => Assert.DoesNotContain('\\', candidate.RelativePath));
+        Assert.That(presented?.Sha256Fingerprint, Is.EqualTo(fingerprint));
+        Assert.That(actualSha256, Is.EqualTo(expectedSha256).IgnoreCase);
+        Assert.That(inventory.Files.Select(candidate => candidate.RelativePath), Has.None.Contains("\\"));
     }
 
-    [SftpFact("SFTP_TEST_HOST", "SFTP_TEST_USERNAME", "SFTP_TEST_PASSWORD")]
-    [Trait("Category", "Integration")]
+    [Test]
     public async Task RejectsMismatchedHostKey()
     {
-        var host = GetRequiredEnvironmentVariable("SFTP_TEST_HOST");
-        var username = GetRequiredEnvironmentVariable("SFTP_TEST_USERNAME");
+        var settings = CreateSettings();
         var password = GetRequiredEnvironmentVariable("SFTP_TEST_PASSWORD");
-
-        var settings = new RemoteSyncSettings
-        {
-            Connection = new ConnectionSettings
+        PresentedHostKey? presented = null;
+        await using var client = new SftpRemoteFileClient(
+            settings,
+            password,
+            key =>
             {
-                Host = host,
-                Port = int.TryParse(Environment.GetEnvironmentVariable("SFTP_TEST_PORT"), out var parsedPort)
-                    ? parsedPort
-                    : 22,
-                Username = username,
-                RemoteFolder = Environment.GetEnvironmentVariable("SFTP_TEST_FOLDER") ?? "/",
-            },
-            Destination = new DestinationSettings
-            {
-                LocalFolder = Path.Combine(Path.GetTempPath(), "remote-sync-sftp-tests", Guid.NewGuid().ToString("N")),
-            },
-        };
-        await using var client = new SftpRemoteFileClient(settings, password, _ => false);
+                presented = key;
+                return false;
+            });
 
-        await Assert.ThrowsAnyAsync<Exception>(() => client.ListFilesAsync(CancellationToken.None));
+        await Assert.ThatAsync(
+            () => client.ListFilesAsync(CancellationToken.None),
+            Throws.TypeOf<SshConnectionException>());
+        Assert.That(presented, Is.Not.Null, "The server must reach host key validation.");
     }
 
-    private static string GetRequiredEnvironmentVariable(string name) =>
-        Environment.GetEnvironmentVariable(name)
-        ?? throw new InvalidOperationException($"The required environment variable {name} disappeared after test discovery.");
-}
-
-[AttributeUsage(AttributeTargets.Method)]
-public sealed class SftpFactAttribute : FactAttribute
-{
-    public SftpFactAttribute(params string[] requiredVariables)
+    private static RemoteSyncSettings CreateSettings() => new()
     {
-        var missing = requiredVariables
-            .Where(name => string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(name)))
-            .ToArray();
-        if (missing.Length != 0)
+        Connection = new ConnectionSettings
         {
-            Skip = $"Set {string.Join(", ", missing)} to run this integration test.";
+            Host = GetRequiredEnvironmentVariable("SFTP_TEST_HOST"),
+            Port = int.TryParse(Environment.GetEnvironmentVariable("SFTP_TEST_PORT"), out var parsedPort)
+                ? parsedPort
+                : 22,
+            Username = GetRequiredEnvironmentVariable("SFTP_TEST_USERNAME"),
+            RemoteFolder = Environment.GetEnvironmentVariable("SFTP_TEST_FOLDER") ?? "/",
+        },
+        Destination = new DestinationSettings
+        {
+            LocalFolder = Path.Combine(Path.GetTempPath(), "remote-sync-sftp-tests", Guid.NewGuid().ToString("N")),
+        },
+    };
+
+    private static string GetRequiredEnvironmentVariable(string name)
+    {
+        var value = Environment.GetEnvironmentVariable(name);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            Assert.Ignore($"Set {name} to run this integration test.");
         }
+
+        return value;
     }
 }

@@ -7,7 +7,7 @@ namespace DbBackup.RemoteSync.Core.Tests;
 
 public sealed class SynchronizationEngineTests
 {
-    [Fact]
+    [Test]
     public async Task DownloadsOnlyMissingFilesAndPreservesTimestamp()
     {
         using var temporary = new TemporaryDirectory();
@@ -31,26 +31,28 @@ public sealed class SynchronizationEngineTests
             CancellationToken.None,
             progress.Add);
 
-        Assert.Equal("local", await File.ReadAllTextAsync(Path.Combine(temporary.Path, "existing.sql")));
-        Assert.Equal("new data", await File.ReadAllTextAsync(Path.Combine(temporary.Path, "nested", "new.sql")));
-        Assert.Equal(1, result.AlreadyPresent);
-        Assert.Equal(1, result.Downloaded);
-        Assert.Equal(2, result.RemoteFiles);
-        Assert.Equal(timestamp.UtcDateTime, File.GetLastWriteTimeUtc(Path.Combine(temporary.Path, "nested", "new.sql")), TimeSpan.FromSeconds(2));
-        Assert.Equal("nested/new.sql", progress[0].RemoteFile);
-        Assert.Equal(0, progress[0].DownloadedBytes);
-        Assert.Equal(8, progress[0].TotalBytes);
-        Assert.Equal(1, progress[0].FileNumber);
-        Assert.Equal(1, progress[0].FileCount);
-        Assert.Equal(0, progress[0].CompletedFiles);
-        Assert.Equal(0, progress[0].OverallDownloadedBytes);
-        Assert.Equal(8, progress[0].OverallTotalBytes);
-        Assert.Equal(8, progress[^1].DownloadedBytes);
-        Assert.Equal(1, progress[^1].CompletedFiles);
-        Assert.Equal(8, progress[^1].OverallDownloadedBytes);
+        var downloadedPath = Path.Combine(temporary.Path, "nested", "new.sql");
+        Assert.That(await File.ReadAllTextAsync(Path.Combine(temporary.Path, "existing.sql")), Is.EqualTo("local"));
+        Assert.That(await File.ReadAllTextAsync(downloadedPath), Is.EqualTo("new data"));
+        Assert.That(result.AlreadyPresent, Is.EqualTo(1));
+        Assert.That(result.Downloaded, Is.EqualTo(1));
+        Assert.That(result.RemoteFiles, Is.EqualTo(2));
+        Assert.That(File.GetLastWriteTimeUtc(downloadedPath),
+            Is.EqualTo(timestamp.UtcDateTime).Within(TimeSpan.FromSeconds(2)));
+        Assert.That(progress[0].RemoteFile, Is.EqualTo("nested/new.sql"));
+        Assert.That(progress[0].DownloadedBytes, Is.EqualTo(0));
+        Assert.That(progress[0].TotalBytes, Is.EqualTo(8));
+        Assert.That(progress[0].FileNumber, Is.EqualTo(1));
+        Assert.That(progress[0].FileCount, Is.EqualTo(1));
+        Assert.That(progress[0].CompletedFiles, Is.EqualTo(0));
+        Assert.That(progress[0].OverallDownloadedBytes, Is.EqualTo(0));
+        Assert.That(progress[0].OverallTotalBytes, Is.EqualTo(8));
+        Assert.That(progress[^1].DownloadedBytes, Is.EqualTo(8));
+        Assert.That(progress[^1].CompletedFiles, Is.EqualTo(1));
+        Assert.That(progress[^1].OverallDownloadedBytes, Is.EqualTo(8));
     }
 
-    [Fact]
+    [Test]
     public async Task ProgressIncludesAllPendingFilesAndAggregateBytes()
     {
         using var temporary = new TemporaryDirectory();
@@ -71,15 +73,15 @@ public sealed class SynchronizationEngineTests
 
         var secondFileStart = progress.First(item =>
             item.FileNumber == 2 && item.DownloadedBytes == 0);
-        Assert.Equal(2, secondFileStart.FileCount);
-        Assert.Equal(1, secondFileStart.CompletedFiles);
-        Assert.Equal(2, secondFileStart.OverallDownloadedBytes);
-        Assert.Equal(5, secondFileStart.OverallTotalBytes);
-        Assert.Equal(2, progress[^1].CompletedFiles);
-        Assert.Equal(5, progress[^1].OverallDownloadedBytes);
+        Assert.That(secondFileStart.FileCount, Is.EqualTo(2));
+        Assert.That(secondFileStart.CompletedFiles, Is.EqualTo(1));
+        Assert.That(secondFileStart.OverallDownloadedBytes, Is.EqualTo(2));
+        Assert.That(secondFileStart.OverallTotalBytes, Is.EqualTo(5));
+        Assert.That(progress[^1].CompletedFiles, Is.EqualTo(2));
+        Assert.That(progress[^1].OverallDownloadedBytes, Is.EqualTo(5));
     }
 
-    [Fact]
+    [Test]
     public async Task CaseInsensitiveCollisionsFailBeforeDownload()
     {
         using var temporary = new TemporaryDirectory();
@@ -91,16 +93,14 @@ public sealed class SynchronizationEngineTests
             });
         var engine = CreateEngine(remote);
 
-        await Assert.ThrowsAsync<InvalidDataException>(() => engine.SynchronizeAsync(
-            TestSettings.Create(temporary.Path),
-            "secret",
-            CreateTrust(),
-            CancellationToken.None));
+        await Assert.ThatAsync(
+            () => engine.SynchronizeAsync(TestSettings.Create(temporary.Path), "secret", CreateTrust(), CancellationToken.None),
+            Throws.TypeOf<InvalidDataException>());
 
-        Assert.Empty(remote.Downloaded);
+        Assert.That(remote.Downloaded, Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public async Task DestinationCreatedDuringTransferIsNotOverwritten()
     {
         using var temporary = new TemporaryDirectory();
@@ -116,12 +116,12 @@ public sealed class SynchronizationEngineTests
             CreateTrust(),
             CancellationToken.None);
 
-        Assert.Equal("winner", await File.ReadAllTextAsync(destination));
-        Assert.Equal(1, result.RaceSkipped);
-        Assert.Empty(Directory.EnumerateFiles(temporary.Path, ".db-backup-download-*.partial"));
+        Assert.That(await File.ReadAllTextAsync(destination), Is.EqualTo("winner"));
+        Assert.That(result.RaceSkipped, Is.EqualTo(1));
+        Assert.That(Directory.EnumerateFiles(temporary.Path, ".db-backup-download-*.partial"), Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public async Task FailedDownloadRemovesPartialAndStopsRun()
     {
         using var temporary = new TemporaryDirectory();
@@ -134,17 +134,15 @@ public sealed class SynchronizationEngineTests
             failFile: "first.sql");
         var engine = CreateEngine(remote);
 
-        await Assert.ThrowsAsync<IOException>(() => engine.SynchronizeAsync(
-            TestSettings.Create(temporary.Path),
-            "secret",
-            CreateTrust(),
-            CancellationToken.None));
+        await Assert.ThatAsync(
+            () => engine.SynchronizeAsync(TestSettings.Create(temporary.Path), "secret", CreateTrust(), CancellationToken.None),
+            Throws.TypeOf<IOException>());
 
-        Assert.False(File.Exists(Path.Combine(temporary.Path, "second.sql")));
-        Assert.Empty(Directory.EnumerateFiles(temporary.Path, ".db-backup-download-*.partial"));
+        Assert.That(File.Exists(Path.Combine(temporary.Path, "second.sql")), Is.False);
+        Assert.That(Directory.EnumerateFiles(temporary.Path, ".db-backup-download-*.partial"), Is.Empty);
     }
 
-    [Fact]
+    [Test]
     public async Task ReturnsRemoteInventorySkipCounts()
     {
         using var temporary = new TemporaryDirectory();
@@ -161,10 +159,10 @@ public sealed class SynchronizationEngineTests
             CreateTrust(),
             CancellationToken.None);
 
-        Assert.Equal(0, result.RemoteFiles);
-        Assert.Equal(2, result.SkippedDirectories);
-        Assert.Equal(3, result.SkippedSymbolicLinks);
-        Assert.Equal(4, result.SkippedSpecialEntries);
+        Assert.That(result.RemoteFiles, Is.EqualTo(0));
+        Assert.That(result.SkippedDirectories, Is.EqualTo(2));
+        Assert.That(result.SkippedSymbolicLinks, Is.EqualTo(3));
+        Assert.That(result.SkippedSpecialEntries, Is.EqualTo(4));
     }
 
     private static SynchronizationEngine CreateEngine(FakeRemoteClient remote) =>
@@ -182,11 +180,12 @@ public sealed class SynchronizationEngineTests
     {
         public IRemoteFileClient Create(RemoteSyncSettings settings, string password, Func<PresentedHostKey, bool> hostKeyValidator)
         {
-            Assert.True(hostKeyValidator(new PresentedHostKey(
+            var hostKey = new PresentedHostKey(
                 settings.Connection.Host,
                 settings.Connection.Port,
                 "ssh-ed25519",
-                "SHA256:test")));
+                "SHA256:test");
+            Assert.That(hostKeyValidator(hostKey), Is.True);
             return client;
         }
     }
